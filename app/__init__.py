@@ -1,9 +1,15 @@
+import psycopg2
 from flask import Flask
 from dotenv import load_dotenv
 from flask_sqlalchemy import SQLAlchemy
+import sqlalchemy as sa
+from sqlalchemy import inspect
+from sqlalchemy.exc import ProgrammingError
+from sqlalchemy.orm import RelationshipProperty
+from sqlalchemy.orm.clsregistry import _ModuleMarker
+
 load_dotenv()
 import os
-from app.config import Config, ProductionConfig
 # from config.py import basedir
 
 app = Flask(__name__)
@@ -35,13 +41,37 @@ app = Flask(__name__)
 #     db = SQLAlchemy(app)
 #     db.create_all()
 
+# app.config['SQLALCHEMY_DATABASE_URI']='postgresql://postgres:123456@localhost:5433/flaskqna'
+# app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+#
+# db=SQLAlchemy(app)
 
-mode = os.environ["FLASK_DEBUG"]
-if mode == 1:
-    app.config.from_object(ProductionConfig())
-    # # print(app.config.values())
-    # # print(app.config.keys())
-    # for i in app.config.items():
-    #     print(i)
+
+app.config['SQLALCHEMY_DATABASE_URI'] = \
+    f"postgresql://{os.environ['DB_USERNAME']}:{os.environ['DB_PASSWORD']}@localhost/{os.environ['DB_NAME']}"
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
+
+db = SQLAlchemy(app)
+
+from app.models.User import User
+
+
+with app.app_context():
+
+    inspector = inspect(db.engine)
+    has_table = inspector.has_table("user")
+
+    if not has_table:
+        db.drop_all()
+        db.create_all()
+        t = User()
+        t.email = "eee"
+        t.username = "eerrte re"
+
+        db.session.add(t)
+        db.session.commit()
+
+
 
 from app.views import home
