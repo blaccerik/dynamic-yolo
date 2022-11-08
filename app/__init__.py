@@ -54,8 +54,6 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db = SQLAlchemy(app)
 
-from app.models.User import User
-
 
 with app.app_context():
 
@@ -65,12 +63,6 @@ with app.app_context():
     if not has_table:
         db.drop_all()
         db.create_all()
-        t = User()
-        t.email = "eee"
-        t.username = "eerrte re"
-
-        db.session.add(t)
-        db.session.commit()
 
 
 
