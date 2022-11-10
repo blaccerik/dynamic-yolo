@@ -1,11 +1,15 @@
+from sqlalchemy import Integer, Column, Float, ForeignKey
+
 from app import db
 
 
 class Annotation(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    annotator = db.Column(db.Integer, nullable=False)
-    confidence = db.Column(db.Float, nullable=False)
-    x_center = db.Column(db.Integer, nullable=False)
-    y_center = db.Column(db.Integer, nullable=False)
-    width = db.Column(db.Integer, nullable=False)
-    height = db.Column(db.Integer, nullable=False)
+    id = Column(Integer, primary_key=True)
+    confidence = Column(Float, nullable=False)
+    x_center = Column(Integer, nullable=False)
+    y_center = Column(Integer, nullable=False)
+    width = Column(Integer, nullable=False)
+    height = Column(Integer, nullable=False)
+    annotator_id = Column(Integer, ForeignKey("annotator.id"), nullable=False)
+    image_id = Column(Integer, ForeignKey("image.id"), nullable=False)
+
