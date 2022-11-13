@@ -1,6 +1,10 @@
 # dynamic-yolo
 
 
+## Work branch
+
+Development is done in `dev` branch.
+
 
 ## Getting started
 
