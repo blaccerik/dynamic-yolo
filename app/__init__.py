@@ -4,13 +4,6 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import inspect
 
-# need to import
-from app.models.image import Image
-from app.models.annotation import Annotation
-from app.models.annotator import Annotator
-
-from app.views import home
-
 load_dotenv()
 
 app = Flask(__name__)
@@ -53,7 +46,21 @@ app.config['SQLALCHEMY_DATABASE_URI'] = \
     f"postgresql://{os.environ['DB_USERNAME']}:{os.environ['DB_PASSWORD']}@localhost/{os.environ['DB_NAME']}"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
+
+# create database
 db = SQLAlchemy(app)
+
+# all database class imports need to be after db object is created
+# they all use db object as parent
+# else it throws circular import error
+from app.models.image import Image
+from app.models.annotation import Annotation
+from app.models.annotator import Annotator
+
+# all route imports need to be imported after db and app objects are creared
+# as they use them
+# else it throws circular import error
+from app.views import home
 
 
 with app.app_context():
