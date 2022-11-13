@@ -57,8 +57,8 @@ from app.models.image import Image
 from app.models.annotation import Annotation
 from app.models.annotator import Annotator
 
-# all route imports need to be imported after db and app objects are creared
-# as they use them
+# all route imports need to be imported after db and app objects are created
+# as route files use db and app object
 # else it throws circular import error
 from app.views import home
 
