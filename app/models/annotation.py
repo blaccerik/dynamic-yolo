@@ -12,4 +12,3 @@ class Annotation(db.Model):
     height = Column(Integer, nullable=False)
     annotator_id = Column(Integer, ForeignKey("annotator.id"), nullable=False)
     image_id = Column(Integer, ForeignKey("image.id"), nullable=False)
-

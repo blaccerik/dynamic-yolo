@@ -1,8 +1,16 @@
+import os
 from dotenv import load_dotenv
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import inspect
-import os
+
+# need to import
+from app.models.image import Image
+from app.models.annotation import Annotation
+from app.models.annotator import Annotator
+
+from app.views import home
+
 load_dotenv()
 
 app = Flask(__name__)
@@ -47,10 +55,6 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db = SQLAlchemy(app)
 
-# need to import
-from app.models.image import Image
-from app.models.annotation import Annotation
-from app.models.annotator import Annotator
 
 with app.app_context():
     inspector = inspect(db.engine)
@@ -83,5 +87,3 @@ with app.app_context():
         # a.height = 100
         # db.session.add(a)
         # db.session.commit()
-
-from app.views import home
