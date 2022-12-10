@@ -56,6 +56,10 @@ db = SQLAlchemy(app)
 from app.models.image import Image
 from app.models.annotation import Annotation
 from app.models.annotator import Annotator
+from app.models.image_class import Class
+from app.models.model_image import ModelImage
+from app.models.model_status import ModelStatus
+from app.models.model import Model
 
 # all route imports need to be imported after db and app objects are created
 # as route files use db and app object
@@ -80,17 +84,21 @@ with app.app_context():
         db.session.add(a2)
         db.session.commit()
 
+        s1 = ModelStatus()
+        s1.name = "training"
+        s2 = ModelStatus()
+        s2.name = "ready"
+        s3 = ModelStatus()
+        s3.name = "idle"
+        db.session.add(s1)
+        db.session.add(s2)
+        db.session.add(s3)
+        db.session.commit()
+
         # test data
         # i = Image()
         # i.image = os.urandom(100000)
+        # i.height = 100
+        # i.width = 200
         # db.session.add(i)
-        # db.session.commit()
-        #
-        # a = Annotation(image=i, annotator=a2)
-        # a.confidence = 0.5
-        # a.x_center = 0
-        # a.y_center = 0
-        # a.width = 100
-        # a.height = 100
-        # db.session.add(a)
         # db.session.commit()
