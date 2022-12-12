@@ -45,6 +45,7 @@ app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = \
     f"postgresql://{os.environ['DB_USERNAME']}:{os.environ['DB_PASSWORD']}@localhost/{os.environ['DB_NAME']}"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+app.config['SECRET_KEY'] = os.environ["SECRET_KEY"]
 
 
 # create database
@@ -65,6 +66,7 @@ from app.models.model import Model
 # as route files use db and app object
 # else it throws circular import error
 from app.views import home
+from app.views import upload
 
 
 with app.app_context():
