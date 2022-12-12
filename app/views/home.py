@@ -4,6 +4,7 @@ import psycopg2
 from flask import render_template
 
 from app import app, db
+from app.api import link_images_and_annotations
 
 
 @app.route('/')
@@ -13,8 +14,5 @@ def hello_world():
 
 @app.route('/hey')
 def hello_world2():
-    res = db.engine.execute("SELECT * FROM user;")
-    names = [row[0] for row in res]
-    print(names)
-
+    link_images_and_annotations()
     return render_template("hello.html")

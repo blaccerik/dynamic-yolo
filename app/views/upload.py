@@ -9,7 +9,7 @@ from wtforms import FileField, SubmitField, MultipleFileField
 from wtforms.validators import InputRequired
 
 from app import app, db
-from app.api import upload_files
+from app.api import upload_files, link_images_and_annotations
 from app.models.annotation import Annotation
 from app.models.image import Image
 
@@ -33,7 +33,7 @@ def _filter_files(files):
             for item in _filestorage_to_db_item(f):
                 yield item
 
-def _text_to_annotations(text):
+def _text_to_annotations(text, name):
     _list = []
     for line in text.splitlines():
         try:
@@ -43,7 +43,7 @@ def _text_to_annotations(text):
             y = float(y)
             w = float(w)
             h = float(h)
-            _list.append(Annotation(x_center=x, y_center=y, width=w, height=h, class_nr=nr))
+            _list.append(Annotation(x_center=x, y_center=y, width=w, height=h, class_nr=nr, annotation_file_name=name))
         except Exception as e:
             continue
     return _list
@@ -52,7 +52,8 @@ def _filestorage_to_db_item(f):
     content = f.stream.read()
     if f.content_type in text_types:  # text file
         text = str(content, "utf-8")
-        _list = _text_to_annotations(text)
+        name = secure_filename(f.filename).split(".")[0]
+        _list = _text_to_annotations(text, name)
         f.stream.close()
         return _list
     else:  # image file
@@ -70,5 +71,6 @@ def upload():
         uploaded_files = request.files.getlist("files")
         uploaded_files = [f for f in _filter_files(uploaded_files)]
         upload_files(uploaded_files)
+        link_images_and_annotations()
         return render_template("success.html")
     return render_template('upload.html', form=form)
