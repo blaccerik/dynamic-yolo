@@ -1,4 +1,4 @@
-from sqlalchemy import func, LargeBinary, DateTime
+from sqlalchemy import func, LargeBinary, DateTime, VARCHAR
 from sqlalchemy import Column, Integer
 from sqlalchemy.orm import relationship
 
@@ -10,6 +10,7 @@ class Image(db.Model):
     image = Column(LargeBinary, nullable=False)
     height = Column(Integer, nullable=False)
     width = Column(Integer, nullable=False)
+    image_name = Column(VARCHAR(128), nullable=False)
     added_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     # annotation_type = db.Column(db.Integer, nullable=False)
     annotations = relationship("Annotation", backref="image")
