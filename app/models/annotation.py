@@ -1,4 +1,4 @@
-from sqlalchemy import Integer, Column, Float, ForeignKey
+from sqlalchemy import Integer, Column, Float, ForeignKey, VARCHAR
 
 from app import db
 
@@ -12,5 +12,6 @@ class Annotation(db.Model):
     height = Column(Float, nullable=False)
     # class_id = Column(Integer, ForeignKey("class.id"), nullable=False)
     class_nr = Column(Integer, nullable=False)
+    annotation_file_name = Column(VARCHAR(128), nullable=False)
     annotator_id = Column(Integer, ForeignKey("annotator.id"), nullable=False)
     image_id = Column(Integer, ForeignKey("image.id"), nullable=True)

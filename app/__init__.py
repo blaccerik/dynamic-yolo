@@ -70,10 +70,11 @@ from app.views import upload
 
 
 with app.app_context():
-    inspector = inspect(db.engine)
-    has_table = inspector.has_table("user")
-
-    if not has_table:
+    print(db.engine.table_names())
+    recreate = False
+    # inspector = inspect(db.engine)
+    # has_table = inspector.has_table("user")
+    if recreate:
         db.drop_all()
         db.create_all()
 
@@ -97,10 +98,3 @@ with app.app_context():
         db.session.add(s3)
         db.session.commit()
 
-        # test data
-        # i = Image()
-        # i.image = os.urandom(100000)
-        # i.height = 100
-        # i.width = 200
-        # db.session.add(i)
-        # db.session.commit()
