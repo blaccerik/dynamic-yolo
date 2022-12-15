@@ -16,7 +16,7 @@ def _add_item(item):
 def link_images_and_annotations():
     """
     Go through Images and Annotations and find if any of them match
-    If they do create a relation
+    If they do create a database relation
     """
     ai = db.session.query(Annotation, Image) \
         .filter(Annotation.name == Image.name,
