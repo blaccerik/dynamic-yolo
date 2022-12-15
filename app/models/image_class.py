@@ -6,7 +6,5 @@ from app import db
 
 class Class(db.Model):
     id = Column(Integer, primary_key=True)
-    class_nr = Column(Integer, nullable=False)
     name = Column(VARCHAR(128), nullable=False, unique=True)
-    # todo create system for class numbers
     # classes = relationship("Annotation", backref="class")
