@@ -18,6 +18,7 @@ class UploadFileForm(FlaskForm):
     files = MultipleFileField("Files", validators=[InputRequired()])
     submit = SubmitField("Upload File")
 
+
 image_types = [
     "image/jpeg",
     "image/png"
@@ -27,11 +28,13 @@ text_types = [
     "text/plain"
 ]
 
+
 def _filter_files(files):
     for f in files:
         if f.content_type in image_types or f.content_type in text_types:
             for item in _filestorage_to_db_item(f):
                 yield item
+
 
 def _text_to_annotations(text, name):
     _list = []
@@ -43,10 +46,11 @@ def _text_to_annotations(text, name):
             y = float(y)
             w = float(w)
             h = float(h)
-            _list.append(Annotation(x_center=x, y_center=y, width=w, height=h, class_nr=nr, annotation_file_name=name))
+            _list.append(Annotation(x_center=x, y_center=y, width=w, height=h, class_id=nr, name=name))
         except Exception as e:
             continue
     return _list
+
 
 def _filestorage_to_db_item(f):
     content = f.stream.read()
@@ -61,7 +65,7 @@ def _filestorage_to_db_item(f):
         img = PIL.Image.open(io_bytes)
         f.stream.close()
         name = secure_filename(f.filename).split(".")[0]
-        return Image(image=content, width=img.size[0], height=img.size[1], image_name=name),
+        return Image(image=content, width=img.size[0], height=img.size[1], name=name),
 
 
 @app.route('/upload', methods=["GET", "POST"])

@@ -61,6 +61,7 @@ from app.models.image_class import Class
 from app.models.model_image import ModelImage
 from app.models.model_status import ModelStatus
 from app.models.model import Model
+from app.models.upload_batch import UploadBatch
 
 # all route imports need to be imported after db and app objects are created
 # as route files use db and app object
@@ -79,14 +80,6 @@ with app.app_context():
         db.create_all()
 
         # static data
-        a1 = Annotator()
-        a1.name = "model"
-        a2 = Annotator()
-        a2.name = "human"
-        db.session.add(a1)
-        db.session.add(a2)
-        db.session.commit()
-
         s1 = ModelStatus()
         s1.name = "training"
         s2 = ModelStatus()
@@ -96,5 +89,13 @@ with app.app_context():
         db.session.add(s1)
         db.session.add(s2)
         db.session.add(s3)
+        db.session.commit()
+
+        a1 = Annotator()
+        a1.name = "model"
+        a2 = Annotator()
+        a2.name = "human"
+        db.session.add(a1)
+        db.session.add(a2)
         db.session.commit()
 

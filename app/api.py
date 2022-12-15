@@ -2,7 +2,8 @@ from app import db
 from app.models.annotation import Annotation
 from app.models.annotator import Annotator
 from app.models.image import Image
-from sqlalchemy.sql import select
+
+from app.models.upload_batch import UploadBatch
 
 
 def _add_item(item):
@@ -15,7 +16,9 @@ def link_images_and_annotations():
     If they do create a relation
     """
     ai = db.session.query(Annotation, Image) \
-        .filter(Annotation.annotation_file_name == Image.image_name, Annotation.image_id == None) \
+        .filter(Annotation.name == Image.name,
+                Annotation.image_id == None,
+                Annotation.upload_batch_id == Image.upload_batch_id) \
         .all()
     for annotation, image in ai:
         annotation.image_id = image.id
@@ -37,10 +40,16 @@ def upload_files(files, add_human=True):
     :param files: db.model objects
     :param add_human: if true then add human annotator to only Annotation object (creates relation)
     """
+
+    ub = UploadBatch()
+    db.session.add(ub)
+    db.session.flush()
+
     if add_human:
         annotator = Annotator.query.filter_by(name='human').first()
     for f in files:
         if add_human and f.__class__ == Annotation:
             f.annotator_id = annotator.id
+        f.upload_batch_id = ub.id
         _add_item(f)
     db.session.commit()
