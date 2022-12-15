@@ -5,6 +5,6 @@ from app import db
 
 
 class Class(db.Model):
-    id = Column(Integer, primary_key=True)
+    id = Column(Integer, primary_key=True, autoincrement=False)
     name = Column(VARCHAR(128), nullable=False, unique=True)
-    # classes = relationship("Annotation", backref="class")
+    classes = relationship("Annotation", backref="class")

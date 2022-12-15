@@ -47,7 +47,6 @@ app.config['SQLALCHEMY_DATABASE_URI'] = \
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config['SECRET_KEY'] = os.environ["SECRET_KEY"]
 
-
 # create database
 db = SQLAlchemy(app)
 
@@ -70,7 +69,36 @@ from app.views import home
 from app.views import upload
 
 
+def _read_names(db):
+    """
+    Read names.txt file and if needed store names into database
+    """
+    path = "classes/names.txt"
+    annotations = {}
+    with open(path, "r") as f:
+        for line in f.readlines():
+            nr, name = line.strip().split(" ", 1)
+            nr = int(nr)
+            annotations[nr] = name
+        classes = db.session.query(Class).all()
+
+        # check if every name is in database
+        try:
+            for _class in classes:
+                del annotations[_class.id]
+        except Exception as e:  # database has more classes than is in names.txt
+            raise RuntimeError("Database mismatch")
+
+        # not all names are in database
+        if len(annotations) > 0:
+            for k, v in annotations.items():
+                db.session.add(Class(id=k, name=v))
+            db.session.commit()
+
+
 with app.app_context():
+    _read_names(db)
+
     print(db.engine.table_names())
     recreate = False
     # inspector = inspect(db.engine)
@@ -98,4 +126,3 @@ with app.app_context():
         db.session.add(a1)
         db.session.add(a2)
         db.session.commit()
-
