@@ -1,6 +1,3 @@
-import os
-
-import psycopg2
 from flask import render_template
 
 from app import app, db
