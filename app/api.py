@@ -1,9 +1,12 @@
+import logging
+
 from app import db
 from app.models.annotation import Annotation
 from app.models.annotator import Annotator
 from app.models.image import Image
 
 from app.models.upload_batch import UploadBatch
+import app.yolo.yolov5.train as train
 
 
 def _add_item(item):
@@ -23,6 +26,32 @@ def link_images_and_annotations():
     for annotation, image in ai:
         annotation.image_id = image.id
     db.session.commit()
+
+
+def start_training():
+    """
+    Start yolo training session with latest data
+    """
+    # set logging to warning to see much less info at console
+    logging.getLogger("yolov5").setLevel(logging.WARNING)
+
+    # train model with labeled images
+    opt = train.parse_opt(True)
+
+    # change some values
+    opt.__setattr__("data", "app/yolo/yolov5/data/coco128.yaml")
+    opt.__setattr__("batch_size", 8)
+    opt.__setattr__("img", 640)
+    opt.__setattr__("epochs", 3)
+    opt.__setattr__("noval", True)  # validate only last epoch
+    opt.__setattr__("noplots", True)  # dont save plots
+    opt.__setattr__("name", "erik_test")
+    opt.__setattr__("weights", "")
+    # opt.__setattr__("cfg", "yolov5n6.yaml")  # use untrained model
+    opt.__setattr__("weights", "app/yolo/yolov5/yolov5s.pt")  # use trained model
+
+    train.main(opt)
+    return
 
 
 def upload_file(file):

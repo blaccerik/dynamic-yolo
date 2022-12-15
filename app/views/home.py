@@ -1,7 +1,7 @@
 from flask import render_template
 
 from app import app, db
-from app.api import link_images_and_annotations
+from app.api import link_images_and_annotations, start_training
 
 
 @app.route('/')
@@ -13,3 +13,8 @@ def hello_world():
 def hello_world2():
     link_images_and_annotations()
     return render_template("hello.html")
+
+@app.route('/train')
+def train():
+    start_training()
+    return "done"
