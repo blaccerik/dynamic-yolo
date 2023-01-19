@@ -5,18 +5,15 @@ import PIL.Image
 from flask import render_template, request
 from flask_wtf import FlaskForm
 from werkzeug.utils import secure_filename
-from wtforms import FileField, SubmitField, MultipleFileField
+from wtforms import FileField, SubmitField, MultipleFileField, StringField
 from wtforms.validators import InputRequired
 
-from app import app, db
-from app.api import upload_files, link_images_and_annotations
+from app import app
+from app.api import upload_files
+from app.forms import UploadFileForm
 from app.models.annotation import Annotation
 from app.models.image import Image
 
-
-class UploadFileForm(FlaskForm):
-    files = MultipleFileField("Files", validators=[InputRequired()])
-    submit = SubmitField("Upload File")
 
 
 image_types = [
@@ -46,7 +43,7 @@ def _text_to_annotations(text, name):
             y = float(y)
             w = float(w)
             h = float(h)
-            _list.append(Annotation(x_center=x, y_center=y, width=w, height=h, class_id=nr, name=name))
+            _list.append((Annotation(x_center=x, y_center=y, width=w, height=h, class_id=nr), name))
         except Exception as e:
             continue
     return _list
@@ -65,16 +62,17 @@ def _filestorage_to_db_item(f):
         img = PIL.Image.open(io_bytes)
         f.stream.close()
         name = secure_filename(f.filename).split(".")[0]
-        return Image(image=content, width=img.size[0], height=img.size[1], name=name),
+        return (Image(image=content, width=img.size[0], height=img.size[1]), name),
 
 
 @app.route('/upload', methods=["GET", "POST"])
 def upload():
     form = UploadFileForm()
     if form.validate_on_submit():
+        project_name = form.project.data
+        uploader = form.uploader.data
         uploaded_files = request.files.getlist("files")
         uploaded_files = [f for f in _filter_files(uploaded_files)]
-        upload_files(uploaded_files)
-        link_images_and_annotations()
-        return render_template("success.html")
+        error = upload_files(uploaded_files, project_name, uploader)
+        return render_template("success.html", error=error)
     return render_template('upload.html', form=form)

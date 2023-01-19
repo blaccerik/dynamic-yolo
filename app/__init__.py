@@ -128,6 +128,11 @@ with app.app_context():
         db.session.add(a2)
         db.session.commit()
 
+        project = Project()
+        project.name = "unknown"
+        db.session.add(project)
+        db.session.commit()
+
         # dummy data
         p1 = Project(name="test1")
         p2 = Project(name="test2")
