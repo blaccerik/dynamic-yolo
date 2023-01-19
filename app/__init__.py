@@ -2,43 +2,11 @@ import os
 from dotenv import load_dotenv
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import inspect
 
 load_dotenv()
 
 app = Flask(__name__)
 
-# app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql:///postgres:password@localhost/flasksql'
-# app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-# app.secret_key = 'secret string'
-#
-# # with app.app_context():
-# db = SQLAlchemy(app)
-#
-# with app.app_context():
-#     db.create_all()
-
-# app.config["SQLALCHEMY_DATABASE_URI"] = 'postgresql://test:test@localhost/mydatabase'
-# # app.config["SQLALCHEMY_DATABASE_URI"] = 'sqlite:///db.sqlite3'
-# app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-#
-# with app.app_context():
-#     db = SQLAlchemy(app)
-#     # db.init_app(app)
-#     db.create_all()
-#
-# app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql:///postgres:password@localhost/flasksql'
-# app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-# app.secret_key = 'secret string'
-#
-# with app.app_context():
-#     db = SQLAlchemy(app)
-#     db.create_all()
-
-# app.config['SQLALCHEMY_DATABASE_URI']='postgresql://postgres:123456@localhost:5433/flaskqna'
-# app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-#
-# db=SQLAlchemy(app)
 
 
 # load configs
@@ -69,32 +37,6 @@ from app.models.model_results import ModelResults
 from app.views import home
 from app.views import upload
 
-
-# def _read_names(db):
-#     """
-#     Read names.txt file and if needed store names into database
-#     """
-#     path = "classes/names.txt"
-#     annotations = {}
-#     with open(path, "r") as f:
-#         for line in f.readlines():
-#             nr, name = line.strip().split(" ", 1)
-#             nr = int(nr)
-#             annotations[nr] = name
-#         classes = db.session.query(Class).all()
-#
-#         # check if every name is in database
-#         try:
-#             for _class in classes:
-#                 del annotations[_class.id]
-#         except Exception as e:  # database has more classes than is in names.txt
-#             raise RuntimeError("Database mismatch")
-#
-#         # not all names are in database
-#         if len(annotations) > 0:
-#             for k, v in annotations.items():
-#                 db.session.add(Class(id=k, name=v))
-#             db.session.commit()
 
 
 with app.app_context():
