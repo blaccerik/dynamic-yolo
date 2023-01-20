@@ -101,7 +101,7 @@ with app.app_context():
     # _read_names(db)
 
     print(db.engine.table_names())
-    recreate = True
+    recreate = False
     # inspector = inspect(db.engine)
     # has_table = inspector.has_table("user")
     if recreate:
@@ -134,9 +134,10 @@ with app.app_context():
         db.session.commit()
 
         # dummy data
+        p = Project(name="project")
         p1 = Project(name="test1")
         p2 = Project(name="test2")
-        db.session.add_all([p1, p2])
+        db.session.add_all([p, p1, p2])
         db.session.flush()
 
         i1 = Image(image=os.urandom(100), height=1, width=1, project_id=p1.id)

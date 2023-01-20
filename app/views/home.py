@@ -16,5 +16,5 @@ def hello_world():
 
 @app.route('/train')
 def train():
-    start_training()
+    start_training("project")
     return "done"
