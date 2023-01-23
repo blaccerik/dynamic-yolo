@@ -6,7 +6,7 @@ from app import db
 
 class Project(db.Model):
     id = Column(BigInteger, primary_key=True)
-    name = Column(VARCHAR(128), nullable=False, unique=False)
+    name = Column(VARCHAR(128), nullable=False, unique=True)
     image_classes = relationship("ImageClass", backref="project")
     images = relationship("Image", backref="project")
     annotations = relationship("Annotation", backref="project")

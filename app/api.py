@@ -1,11 +1,15 @@
 import logging
+import os
+from io import BytesIO
 
 from app import db
 from app.models.annotation import Annotation
 from app.models.annotator import Annotator
 from app.models.image import Image
+import PIL
 
 import app.yolo.yolov5.train as train
+import yaml
 from app.models.project import Project
 
 # def link_images_and_annotations():
@@ -23,10 +27,51 @@ from app.models.project import Project
 #     db.session.commit()
 
 
-def start_training():
+def start_training(project_name: str):
     """
-    Start yolo training session with latest data
+    Start yolo training session with the latest data
     """
+
+    project = Project.query.filter_by(name=project_name).first()
+    if project is None:
+        return "project not found"
+
+    # todo use only fresh images
+    images = Image.query.filter_by(project_id=project.id).all()
+    count = 0
+    max_class_id = 0
+    for image in images:
+        annotations = Annotation.query.filter_by(project_id=project.id, image_id=image.id).all()
+
+        # save image
+        content = image.image
+        with open(f"app/yolo/datasets/data/images/{count}.png", "wb") as binary_file:
+            binary_file.write(content)
+        text = ""
+        for annotation in annotations:
+            if annotation.class_id > max_class_id:
+                max_class_id = annotation.class_id
+            line = f"{annotation.class_id} {annotation.x_center} {annotation.y_center} {annotation.width} {annotation.height}\n"
+            text += line
+        with open(f"app/yolo/datasets/data/labels/{count}.txt", "w") as text_file:
+            text_file.write(text)
+        count += 1
+
+    # create yaml file
+    data = {
+        "path": "../datasets/data",
+        "train": "images",
+        "val": "images",
+        "names": {}
+    }
+
+    # todo add names for classes
+    for i in range(max_class_id + 1):
+        data["names"][i] = i
+
+    with open('app/yolo/yolov5/data/data.yaml', 'w') as outfile:
+        yaml.dump(data, outfile, default_flow_style=False)
+
     # set logging to warning to see much less info at console
     logging.getLogger("yolov5").setLevel(logging.WARNING)
 
@@ -34,19 +79,26 @@ def start_training():
     opt = train.parse_opt(True)
 
     # change some values
-    opt.__setattr__("data", "app/yolo/yolov5/data/coco128.yaml")
-    opt.__setattr__("batch_size", 8)
-    opt.__setattr__("img", 640)
-    opt.__setattr__("epochs", 3)
-    opt.__setattr__("noval", True)  # validate only last epoch
-    opt.__setattr__("noplots", True)  # dont save plots
-    opt.__setattr__("name", "erik_test")
-    opt.__setattr__("weights", "")
+    setattr(opt, "data", "app/yolo/yolov5/data/data.yaml")
+    setattr(opt, "batch_size", 8)
+    setattr(opt, "img", 640)
+    setattr(opt, "epochs", 3)
+    setattr(opt, "noval", True)  # validate only last epoch
+    setattr(opt, "noplots", True)  # dont save plots
+    setattr(opt, "name", "erik_test")
+    setattr(opt, "weights", "")
     # opt.__setattr__("cfg", "yolov5n6.yaml")  # use untrained model
-    opt.__setattr__("weights", "app/yolo/yolov5/yolov5s.pt")  # use trained model
-
+    setattr(opt, "weights", "app/yolo/yolov5/yolov5s.pt")  # use trained model
     train.main(opt)
-    return
+
+    # delete images from disk
+    for i in os.listdir("app/yolo/datasets/data/labels"):
+        label = os.path.join("app/yolo/datasets/data/labels", i)
+        os.remove(label)
+
+    for i in os.listdir("app/yolo/datasets/data/images"):
+        image = os.path.join("app/yolo/datasets/data/images", i)
+        os.remove(image)
 
 
 def upload_file(file):
