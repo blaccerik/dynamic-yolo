@@ -1,12 +1,8 @@
 from io import BytesIO
-from time import sleep
 
-import PIL.Image
 from flask import render_template, request
-from flask_wtf import FlaskForm
+
 from werkzeug.utils import secure_filename
-from wtforms import FileField, SubmitField, MultipleFileField, StringField
-from wtforms.validators import InputRequired
 
 from app import app
 from app.api import upload_files
@@ -14,7 +10,7 @@ from app.forms import UploadFileForm
 from app.models.annotation import Annotation
 from app.models.image import Image
 
-
+import PIL.Image
 
 image_types = [
     "image/jpeg",
