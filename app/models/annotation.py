@@ -12,6 +12,7 @@ class Annotation(db.Model):
     width = Column(Float, nullable=False)
     height = Column(Float, nullable=False)
     class_id = Column(Integer, nullable=False)
+    batch_id = Column(BigInteger, nullable=False)
     # image_class_id = Column(BigInteger, ForeignKey("image_class.id"), nullable=False)
     project_id = Column(BigInteger, ForeignKey("project.id"), nullable=False)
     image_id = Column(BigInteger, ForeignKey("image.id"), nullable=True)

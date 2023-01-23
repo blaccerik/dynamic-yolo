@@ -25,7 +25,7 @@ from app.models.image import Image
 from app.models.annotation import Annotation
 from app.models.annotator import Annotator
 from app.models.image_class import ImageClass
-from app.models.model_image import ModelImage
+from app.models.queue import Queue
 from app.models.model_status import ModelStatus
 from app.models.model import Model
 from app.models.project import Project
@@ -43,7 +43,7 @@ with app.app_context():
     # _read_names(db)
 
     print(db.engine.table_names())
-    recreate = False
+    recreate = True
     # inspector = inspect(db.engine)
     # has_table = inspector.has_table("user")
     if recreate:
@@ -82,9 +82,9 @@ with app.app_context():
         db.session.add_all([p, p1, p2])
         db.session.flush()
 
-        i1 = Image(image=os.urandom(100), height=1, width=1, project_id=p1.id)
-        i2 = Image(image=os.urandom(200), height=2, width=2, project_id=p2.id)
-        i3 = Image(image=os.urandom(200), height=2, width=2, project_id=p2.id)
+        i1 = Image(image=os.urandom(100), height=1, width=1, project_id=p1.id, batch_id=1)
+        i2 = Image(image=os.urandom(200), height=2, width=2, project_id=p2.id, batch_id=1)
+        i3 = Image(image=os.urandom(200), height=2, width=2, project_id=p2.id, batch_id=2)
         db.session.add_all([i1, i2, i3])
         db.session.flush()
 
@@ -97,24 +97,24 @@ with app.app_context():
         db.session.flush()
 
         a = Annotator.query.filter_by(name="human").first()
-        a1 = Annotation(project_id=p1.id, image_id=i1.id, annotator_id=a.id, x_center=0, y_center=0, width=0, height=0, class_id=0)
-        a2 = Annotation(project_id=p1.id, image_id=i1.id, annotator_id=a.id, x_center=0, y_center=0, width=0, height=0, class_id=0)
-        a3 = Annotation(project_id=p2.id, image_id=i2.id, annotator_id=a.id, x_center=0, y_center=0, width=0, height=0, class_id=0)
+        a1 = Annotation(project_id=p1.id, image_id=i1.id, annotator_id=a.id, x_center=0, y_center=0, width=0, height=0, class_id=0, batch_id=1)
+        a2 = Annotation(project_id=p1.id, image_id=i1.id, annotator_id=a.id, x_center=0, y_center=0, width=0, height=0, class_id=0, batch_id=2)
+        a3 = Annotation(project_id=p2.id, image_id=i2.id, annotator_id=a.id, x_center=0, y_center=0, width=0, height=0, class_id=0, batch_id=1)
         db.session.add_all([a1, a2, a3])
         db.session.flush()
 
         ms = ModelStatus.query.filter_by(name="idle").first()
-        m1 = Model(model_status_id=ms.id)
-        m2 = Model(model_status_id=ms.id)
+        m1 = Model(model_status_id=ms.id, latest_batch_id=1, project_id=p1.id)
+        m2 = Model(model_status_id=ms.id, latest_batch_id=2, project_id=p1.id)
         db.session.add_all([m1, m2])
         db.session.flush()
 
-        mi1 = ModelImage(model_id=m1.id, image_id=m1.id)
-        mi2 = ModelImage(model_id=m1.id, image_id=m2.id)
-        mi3 = ModelImage(model_id=m2.id, image_id=m1.id)
-        mi4 = ModelImage(model_id=m2.id, image_id=m2.id)
-        db.session.add_all([mi1, mi2, mi3, mi4])
-        db.session.flush()
+        # mi1 = ModelImage(model_id=m1.id, image_id=m1.id)
+        # mi2 = ModelImage(model_id=m1.id, image_id=m2.id)
+        # mi3 = ModelImage(model_id=m2.id, image_id=m1.id)
+        # mi4 = ModelImage(model_id=m2.id, image_id=m2.id)
+        # db.session.add_all([mi1, mi2, mi3, mi4])
+        # db.session.flush()
 
         mr1 = ModelResults(model_id=m1.id)
         mr2 = ModelResults(model_id=m1.id)

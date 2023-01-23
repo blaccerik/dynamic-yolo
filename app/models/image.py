@@ -12,4 +12,5 @@ class Image(db.Model):
     width = Column(Integer, nullable=False)
     project_id = Column(BigInteger, ForeignKey("project.id"), nullable=False)
     annotations = relationship("Annotation", backref="image")
-    models = relationship("Model", secondary="model_image", back_populates="images")
+    batch_id = Column(BigInteger, nullable=False)
+    # models = relationship("Model", secondary="model_image", back_populates="images")
