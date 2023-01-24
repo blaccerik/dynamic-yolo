@@ -2,6 +2,7 @@ from flask import render_template
 
 from app import app, db
 from app.api import start_training
+from app.queue import add_to_queue
 
 
 @app.route('/')
@@ -17,4 +18,10 @@ def hello_world():
 @app.route('/train')
 def train():
     start_training("project")
+    return "done"
+
+
+@app.route('/queue')
+def queue():
+    add_to_queue("project")
     return "done"

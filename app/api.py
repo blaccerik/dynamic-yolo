@@ -11,6 +11,8 @@ import PIL
 import app.yolo.yolov5.train as train
 import yaml
 from app.models.project import Project
+from app.queue import add_to_queue
+
 
 # def link_images_and_annotations():
 #     """
@@ -164,5 +166,5 @@ def upload_files(files: list, project_name: str, uploader: str):
     db.session.add(project)
     db.session.commit()
 
-    # todo update queue manager to request project to be retrained
+    add_to_queue(project_name)
     return "done"
