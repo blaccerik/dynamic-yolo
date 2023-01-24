@@ -1,42 +1,79 @@
 import os
+import csv
+import shutil
 from app import app
 from app.api import upload_files
+from app.models.annotation import Annotation
 from app.models.image import Image
+from app.models.project import Project
 from PIL import Image as pil_image
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
+# File types that we are interested in processing
+image_types = (".jpeg", ".jpg", ".png")
+text_types = (".txt")
+
 
 class Handler(FileSystemEventHandler):
-    """Handler decides what to do in case of a change in monitored directory"""
+    """
+    Handler decides what to do in case of a change in monitored directory
+    """
 
     @staticmethod
     def on_created(event):
-        files = os.listdir(event.src_path)
         with app.app_context():
-            uploaded_files = [f for f in _filter_files(files, event.src_path)]
-            upload_files(uploaded_files, 'test1', 'human')
+            project_name = event.src_path.split('/')[-1]
+            uploader = "human"
+            does_project_exist = Project.query.filter_by(name=project_name).first()
+
+            if does_project_exist:
+                files = os.listdir(event.src_path)
+                uploaded_files = [f for f in _filter_files(files, event.src_path)]
+                upload_files(uploaded_files, project_name, uploader)
+                shutil.rmtree(event.src_path)
+            else:
+                shutil.rmtree(event.src_path)
 
 
 def _filter_files(files, path):
     for f in files:
-        for item in _convert_to_db_items(f, path):
-            yield item
+        if f.endswith(image_types) or f.endswith(text_types):
+            for item in _convert_to_db_items(f, path):
+                yield item
+
+
+def _text_to_annotations(path, name):
+    _list = []
+    with open(path, 'r') as file:
+        reader = csv.reader(file, delimiter=' ')
+        for row in reader:
+            nr = int(row[0])
+            x = float(row[1])
+            y = float(row[2])
+            w = float(row[3])
+            h = float(row[4])
+            _list.append((Annotation(x_center=x, y_center=y, width=w, height=h, class_id=nr), name))
+    return _list
 
 
 def _convert_to_db_items(f: str, path: str):
-    if f.endswith('.jpg') or f.endswith('.png'):
-        with pil_image.open(os.path.join(path, f)) as img:
+    full_path = os.path.join(path, f)
+    file_name = f.split('.')[0]
+
+    if f.endswith(image_types):
+        with pil_image.open(full_path) as img:
             width, height = img.size
             img_binary = img.tobytes()
-            name = f.split('.')[0]
-            return (Image(image=img_binary, width=width, height=height, project_id=1), name),
+            return (Image(image=img_binary, width=width, height=height), file_name),
+    else:
+        return _text_to_annotations(full_path, file_name)
 
 
 if __name__ == '__main__':
     event_handler = Handler()
     observer = Observer()
-    observer.schedule(event_handler, path=os.path.join(os.path.dirname(os.path.abspath(__file__)),'images_to_upload'))
+    observer.schedule(event_handler, path=os.path.join(os.path.dirname(os.path.abspath(__file__)), 'images_to_upload'))
     observer.start()
     app.run(debug=False)
     observer.join()
