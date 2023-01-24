@@ -1,13 +1,15 @@
+import atexit
 import os
+import time
+
 from dotenv import load_dotenv
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
+from apscheduler.schedulers.background import BackgroundScheduler
 
 load_dotenv()
 
 app = Flask(__name__)
-
-
 
 # load configs
 app.config['SQLALCHEMY_DATABASE_URI'] = \
@@ -37,7 +39,7 @@ from app.models.model_results import ModelResults
 from app.views import home
 from app.views import upload
 
-
+from app.queue import update_queue
 
 with app.app_context():
     # _read_names(db)
@@ -120,3 +122,11 @@ with app.app_context():
         mr3 = ModelResults(model_id=m2.id)
         db.session.add_all([mr1, mr2, mr3])
         db.session.commit()
+
+    if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
+        scheduler = BackgroundScheduler()
+        scheduler.add_job(func=update_queue, trigger="interval", seconds=3)
+        scheduler.start()
+        atexit.register(lambda: scheduler.shutdown())
+
+
