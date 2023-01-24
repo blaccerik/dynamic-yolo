@@ -1,16 +1,17 @@
 import logging
 import os
-from io import BytesIO
 
 from app import db
 from app.models.annotation import Annotation
 from app.models.annotator import Annotator
 from app.models.image import Image
-import PIL
 
 import app.yolo.yolov5.train as train
 import yaml
+
+from app.models.image_class import ImageClass
 from app.models.project import Project
+
 
 # def link_images_and_annotations():
 #     """
@@ -25,6 +26,22 @@ from app.models.project import Project
 #     for annotation, image in ai:
 #         annotation.image_id = image.id
 #     db.session.commit()
+
+def upload_classes_to_db(project_name: str, classes: dict):
+    """
+    Upload classes to database.
+    :param project_name: name of the project that the classes belong to
+    :param classes: various classes {0:'dog',1:'cat'}
+    """
+    project = Project.query.filter_by(name=project_name).first()
+
+    if project is None:
+        return "Project is unknown"
+
+    for class_nr, class_name in classes.items():
+        i = ImageClass(project_id=project.id, name=class_name, class_id=class_nr)
+        db.session.add(i)
+    db.session.commit()
 
 
 def start_training(project_name: str):
@@ -166,3 +183,24 @@ def upload_files(files: list, project_name: str, uploader: str):
 
     # todo update queue manager to request project to be retrained
     return "done"
+
+
+def check_existing_annotations(project_name):
+    """
+    Check the already existing annotations and remove them if they have a class
+    that does not exist in the database
+    :return:
+    """
+    project = Project.query.filter_by(name=project_name).first()
+
+    annotations_to_delete = (
+        db.session.query(Annotation)
+        .filter(Annotation.project_id == project.id)
+        .filter(
+            ~Annotation.class_id.in_(db.session.query(ImageClass.class_id).filter(ImageClass.project_id == project.id)))
+        .all()
+    )
+    for annotation in annotations_to_delete:
+        db.session.delete(annotation)
+
+    db.session.commit()

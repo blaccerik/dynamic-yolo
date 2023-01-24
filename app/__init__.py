@@ -7,8 +7,6 @@ load_dotenv()
 
 app = Flask(__name__)
 
-
-
 # load configs
 app.config['SQLALCHEMY_DATABASE_URI'] = \
     f"postgresql://{os.environ['DB_USERNAME']}:{os.environ['DB_PASSWORD']}@localhost/{os.environ['DB_NAME']}"
@@ -36,8 +34,7 @@ from app.models.model_results import ModelResults
 # else it throws circular import error
 from app.views import home
 from app.views import upload
-
-
+from app.views import upload_classes
 
 with app.app_context():
     # _read_names(db)
@@ -88,17 +85,20 @@ with app.app_context():
         db.session.flush()
 
         db.session.add_all([
-            ImageClass(project_id=p1.id, name="a", class_id=1),
-            ImageClass(project_id=p1.id, name="b", class_id=2),
-            ImageClass(project_id=p2.id, name="c", class_id=2),
-            ImageClass(project_id=p2.id, name="d", class_id=1)
+            ImageClass(project_id=p1.id, name="a", class_id=1000),
+            ImageClass(project_id=p1.id, name="b", class_id=2000),
+            ImageClass(project_id=p2.id, name="c", class_id=2000),
+            ImageClass(project_id=p2.id, name="d", class_id=1000)
         ])
         db.session.flush()
 
         a = Annotator.query.filter_by(name="human").first()
-        a1 = Annotation(project_id=p1.id, image_id=i1.id, annotator_id=a.id, x_center=0, y_center=0, width=0, height=0, class_id=0, batch_id=1)
-        a2 = Annotation(project_id=p1.id, image_id=i1.id, annotator_id=a.id, x_center=0, y_center=0, width=0, height=0, class_id=0, batch_id=2)
-        a3 = Annotation(project_id=p2.id, image_id=i2.id, annotator_id=a.id, x_center=0, y_center=0, width=0, height=0, class_id=0, batch_id=1)
+        a1 = Annotation(project_id=p1.id, image_id=i1.id, annotator_id=a.id, x_center=0, y_center=0, width=0, height=0,
+                        class_id=0, batch_id=1)
+        a2 = Annotation(project_id=p1.id, image_id=i1.id, annotator_id=a.id, x_center=0, y_center=0, width=0, height=0,
+                        class_id=0, batch_id=2)
+        a3 = Annotation(project_id=p2.id, image_id=i2.id, annotator_id=a.id, x_center=0, y_center=0, width=0, height=0,
+                        class_id=0, batch_id=1)
         db.session.add_all([a1, a2, a3])
         db.session.flush()
 
