@@ -43,7 +43,7 @@ with app.app_context():
     # _read_names(db)
 
     print(db.engine.table_names())
-    recreate = True
+    recreate = False
     # inspector = inspect(db.engine)
     # has_table = inspector.has_table("user")
     if recreate:
@@ -70,15 +70,14 @@ with app.app_context():
         db.session.add(a2)
         db.session.commit()
 
-        project = Project()
-        project.name = "unknown"
+        project = Project(name="unknown", latest_batch=0)
         db.session.add(project)
         db.session.commit()
 
         # dummy data
-        p = Project(name="project")
-        p1 = Project(name="test1")
-        p2 = Project(name="test2")
+        p = Project(name="project", latest_batch=0)
+        p1 = Project(name="test1", latest_batch=0)
+        p2 = Project(name="test2", latest_batch=0)
         db.session.add_all([p, p1, p2])
         db.session.flush()
 
@@ -104,8 +103,8 @@ with app.app_context():
         db.session.flush()
 
         ms = ModelStatus.query.filter_by(name="idle").first()
-        m1 = Model(model_status_id=ms.id, latest_batch_id=1, project_id=p1.id)
-        m2 = Model(model_status_id=ms.id, latest_batch_id=2, project_id=p1.id)
+        m1 = Model(model_status_id=ms.id, latest_batch=1, project_id=p1.id)
+        m2 = Model(model_status_id=ms.id, latest_batch=2, project_id=p1.id)
         db.session.add_all([m1, m2])
         db.session.flush()
 

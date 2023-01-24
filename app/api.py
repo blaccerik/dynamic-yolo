@@ -125,12 +125,15 @@ def upload_files(files: list, project_name: str, uploader: str):
     if project is None:
         return "project not found"
 
+    batch_nr = project.latest_batch + 1
+
     # flush all images and mark them with unknown project id
     _dict = {}
     for f, name in files:
-        if f.__class__ == Image:
+        if type(f) is Image:
             _dict[name] = [f, False]
             f.project_id = unknown_project.id
+            f.batch_id = 0
             db.session.add(f)
     db.session.flush()
 
@@ -138,20 +141,28 @@ def upload_files(files: list, project_name: str, uploader: str):
     # if does make connection, also add mark to later change project id
     # else drop annotation
     for f, name in files:
-        if f.__class__ == Annotation:
+        if type(f) is Annotation:
             if name in _dict:
                 i, _ = _dict[name]
                 _dict[name] = [i, True]
                 f.image_id = i.id
                 f.project_id = project.id
                 f.annotator_id = annotator.id
+                f.batch_id = batch_nr
                 db.session.add(f)
 
     # if image has mark then change project id
     for f, name in files:
-        if f.__class__ == Image:
+        if type(f) is Image:
             if _dict[name][1]:
                 f.project_id = project.id
+                f.batch_id = batch_nr
                 db.session.add(f)
+
+    # update model
+    project.latest_batch = batch_nr
+    db.session.add(project)
     db.session.commit()
+
+    # todo update queue manager to request project to be retrained
     return "done"

@@ -7,10 +7,10 @@ from app import db
 class Project(db.Model):
     id = Column(BigInteger, primary_key=True)
     name = Column(VARCHAR(128), nullable=False, unique=True)
-    newest_model_id = Column(BigInteger, nullable=True)
+
+    latest_batch = Column(BigInteger, nullable=False)
 
     queue = relationship('Queue', backref='project', lazy=True, uselist=False)
-
     image_classes = relationship("ImageClass", backref="project")
     images = relationship("Image", backref="project")
     annotations = relationship("Annotation", backref="project")
