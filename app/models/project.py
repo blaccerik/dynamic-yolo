@@ -10,6 +10,9 @@ class Project(db.Model):
 
     latest_batch = Column(BigInteger, nullable=False)
 
+    # todo add relation with model if possible
+    latest_model_id = Column(BigInteger, nullable=True)
+
     queue = relationship('Queue', backref='project', lazy=True, uselist=False)
     image_classes = relationship("ImageClass", backref="project")
     images = relationship("Image", backref="project")

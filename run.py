@@ -1,14 +1,19 @@
+import atexit
 import os
 import csv
+import os
 import shutil
-from app import app
+
+from PIL import Image as pil_image
+from apscheduler.schedulers.background import BackgroundScheduler
+from watchdog.events import FileSystemEventHandler
+from watchdog.observers import Observer
+
+from app import app, update_queue, scheduler
 from app.api import upload_files
 from app.models.annotation import Annotation
 from app.models.image import Image
 from app.models.project import Project
-from PIL import Image as pil_image
-from watchdog.observers import Observer
-from watchdog.events import FileSystemEventHandler
 
 # File types that we are interested in processing
 image_types = (".jpeg", ".jpg", ".png")
@@ -68,7 +73,6 @@ def _convert_to_db_items(f: str, path: str):
             return (Image(image=img_binary, width=width, height=height), file_name),
     else:
         return _text_to_annotations(full_path, file_name)
-
 
 if __name__ == '__main__':
     event_handler = Handler()

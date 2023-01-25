@@ -1,6 +1,3 @@
-import logging
-import os
-
 from app import db
 from app.models.annotation import Annotation
 from app.models.annotator import Annotator
@@ -181,7 +178,7 @@ def upload_files(files: list, project_name: str, uploader: str):
     db.session.add(project)
     db.session.commit()
 
-    # todo update queue manager to request project to be retrained
+    add_to_queue(project.id)
     return "done"
 
 
