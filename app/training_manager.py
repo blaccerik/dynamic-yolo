@@ -30,20 +30,29 @@ from app.yolo.yolov5 import train
 class TrainSession:
     def __init__(self, project: Project):
         ms = ModelStatus.query.filter_by(name="training").first()
+
+        model_id = project.latest_model_id
+
+        # create new model
         self.model = Model(model_status_id=ms.id, latest_batch=project.latest_batch, project_id=project.id)
+        self.model_path = "app/yolo/yolov5/yolov5s.pt"
+        if model_id is not None:
+            # todo use correct model path
+            self.model.parent_model_id = model_id
+
+        # update database
         self.project = project
         db.session.add(self.model)
         db.session.flush()
-
         project.latest_model_id = self.model.id
         db.session.add(project)
         db.session.commit()
-        # todo use prev model and write it to disk
-        self.model_path = "app/yolo/yolov5/yolov5s.pt"
 
-    def train(self, batch_nr):
+    def load_data(self):
         # get images
-        images = Image.query.filter(Image.project_id == self.project.id).filter(Image.batch_id >= batch_nr)
+        images = Image.query\
+            .filter(Image.project_id == self.project.id)\
+            .filter(Image.batch_id >= self.project.latest_batch)
 
         count = 0
         max_class_id = 0
@@ -78,6 +87,8 @@ class TrainSession:
 
         with open('app/yolo/yolov5/data/data.yaml', 'w') as outfile:
             yaml.dump(data, outfile, default_flow_style=False)
+
+    def train(self):
 
         # set logging to warning to see much less info at console
         logging.getLogger("yolov5").setLevel(logging.WARNING)
@@ -114,7 +125,7 @@ class TrainSession:
         db.session.commit()
 
 
-def start_training(project_id: int, batch_nr: int):
+def start_training(project_id: int):
     """
     Start yolo training session with the latest data
     """
@@ -122,4 +133,5 @@ def start_training(project_id: int, batch_nr: int):
     if project is None:
         return "project not found"
     ts = TrainSession(project)
-    ts.train(batch_nr)
+    ts.load_data()
+    ts.train()

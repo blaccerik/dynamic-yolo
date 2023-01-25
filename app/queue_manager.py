@@ -20,11 +20,9 @@ def update_queue():
         first = queue.pop(0)
         project_id = first.project_id
 
-        project = Project.query.get(project_id)
-        model_id = project.latest_model_id
-        # no models found, create new one
-        if model_id is None:
-            start_training(project_id, 0)
+        start_training(project_id)
+        #
+        # print(model_id)
 
         # update queue
         db.session.delete(first)
