@@ -8,7 +8,7 @@ from app.training_manager import start_training
 
 def update_queue():
     """
-    Update queue
+    Call this function to check for updates in the queue
     :return:
     """
     with app.app_context():
@@ -21,8 +21,6 @@ def update_queue():
         project_id = first.project_id
 
         start_training(project_id)
-        #
-        # print(model_id)
 
         # update queue
         db.session.delete(first)
@@ -31,7 +29,6 @@ def update_queue():
             q.position = q.position - 1
             db.session.add(q)
         db.session.commit()
-
 
 
 def add_to_queue(project_id: int):

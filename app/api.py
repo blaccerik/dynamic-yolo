@@ -7,22 +7,6 @@ from app.models.project import Project
 from app.queue_manager import add_to_queue
 
 
-# def link_images_and_annotations():
-#     """
-#     Go through Images and Annotations and find if any of them match
-#     If they do create a database relation
-#     """
-#     ai = db.session.query(Annotation, Image) \
-#         .filter(Annotation.name == Image.name,
-#                 Annotation.image_id == None,
-#                 Annotation.upload_batch_id == Image.upload_batch_id) \
-#         .all()
-#     for annotation, image in ai:
-#         annotation.image_id = image.id
-#     db.session.commit()
-
-
-
 def upload_file(file):
     """
     Upload single object to database

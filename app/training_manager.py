@@ -12,21 +12,6 @@ from app.models.project import Project
 from app.yolo.yolov5 import train
 
 
-# def _get_model(project) -> str:
-#     if project.latest_model_id is None:  # new model
-#
-#         m = Model(model_status_id=ms.id, latest_batch=project.latest_batch, project_id=project.id)
-#         db.session.add(m)
-#         db.session.flush()
-#
-#         project.latest_model_id = m.id
-#         db.session.add(project)
-#         db.session.commit()
-#         return "app/yolo/yolov5/yolov5s.pt"
-#     # todo use prev model and write it to disk
-#     return "app/yolo/yolov5/yolov5s.pt"
-
-
 class TrainSession:
     def __init__(self, project: Project):
         ms = ModelStatus.query.filter_by(name="training").first()
@@ -50,8 +35,8 @@ class TrainSession:
 
     def load_data(self):
         # get images
-        images = Image.query\
-            .filter(Image.project_id == self.project.id)\
+        images = Image.query \
+            .filter(Image.project_id == self.project.id) \
             .filter(Image.batch_id >= self.project.latest_batch)
 
         count = 0
@@ -64,10 +49,10 @@ class TrainSession:
             with open(f"app/yolo/datasets/data/images/{count}.png", "wb") as binary_file:
                 binary_file.write(content)
             text = ""
-            for annotation in annotations:
-                if annotation.class_id > max_class_id:
-                    max_class_id = annotation.class_id
-                line = f"{annotation.class_id} {annotation.x_center} {annotation.y_center} {annotation.width} {annotation.height}\n"
+            for a in annotations:
+                if a.class_id > max_class_id:
+                    max_class_id = a.class_id
+                line = f"{a.class_id} {a.x_center} {a.y_center} {a.width} {a.height}\n"
                 text += line
             with open(f"app/yolo/datasets/data/labels/{count}.txt", "w") as text_file:
                 text_file.write(text)
@@ -91,7 +76,7 @@ class TrainSession:
     def train(self):
 
         # set logging to warning to see much less info at console
-        logging.getLogger("yolov5").setLevel(logging.WARNING)
+        # logging.getLogger("yolov5").setLevel(logging.WARNING)
 
         # train model with labeled images
         opt = train.parse_opt(True)
@@ -119,6 +104,7 @@ class TrainSession:
             image = os.path.join("app/yolo/datasets/data/images", i)
             os.remove(image)
 
+        # update database
         ms = ModelStatus.query.filter_by(name="ready").first()
         self.model.model_status_id = ms.id
         db.session.add(self.model)
