@@ -39,7 +39,7 @@ from app.models.model_results import ModelResults
 from app.views import home
 from app.views import upload
 
-from app.queue import update_queue
+from app.queue_manager import update_queue
 
 with app.app_context():
     # _read_names(db)

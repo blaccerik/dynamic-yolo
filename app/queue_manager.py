@@ -1,37 +1,46 @@
-import time
-
-from sqlalchemy import func, event, asc
-from sqlalchemy.orm import Session
+from sqlalchemy import func, asc
 
 from app import db, app
 from app.models.project import Project
 from app.models.queue import Queue
+from app.training_manager import start_training
+
 
 def update_queue():
     """
-
+    Update queue
     :return:
     """
     with app.app_context():
         queue = Queue.query.order_by(asc(Queue.position)).all()
-        if len(queue) != 0:
-            print(queue)
-            first = queue.pop(0)
-            # todo start training
-            db.session.delete(first)
-            db.session.commit()
-            for q in queue:
-                q.position = q.position - 1
-                db.session.add(q)
-            db.session.commit()
 
-def add_to_queue(project_name: str):
+        # check if anything is in the queue
+        if len(queue) == 0:
+            return
+        first = queue.pop(0)
+        project_id = first.project_id
+
+        project = Project.query.get(project_id)
+        model_id = project.latest_model_id
+        # no models found, create new one
+        if model_id is None:
+            start_training(project_id, 0)
+
+        # update queue
+        db.session.delete(first)
+        db.session.commit()
+        for q in queue:
+            q.position = q.position - 1
+            db.session.add(q)
+        db.session.commit()
+
+
+
+def add_to_queue(project_id: int):
     """
     Add project to query
-    :param project_name:
-    :return:
     """
-    project = Project.query.filter_by(name=project_name).first()
+    project = Project.query.get(project_id)
     if project is None:
         return "project not found"
 
