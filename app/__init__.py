@@ -32,6 +32,8 @@ from app.models.model_status import ModelStatus
 from app.models.model import Model
 from app.models.project import Project
 from app.models.model_results import ModelResults
+from app.models.project_settings import ProjectSettings
+from app.models.model_image import ModelImage
 
 # all route imports need to be imported after db and app objects are created
 # as route files use db and app object
@@ -46,7 +48,7 @@ with app.app_context():
     # _read_names(db)
 
     print(db.engine.table_names())
-    recreate = True
+    recreate = False
     # inspector = inspect(db.engine)
     # has_table = inspector.has_table("user")
     if recreate:
@@ -73,14 +75,33 @@ with app.app_context():
         db.session.add(a2)
         db.session.commit()
 
-        p1 = Project(name="test1", latest_batch=0)
-        p2 = Project(name="test2", latest_batch=0)
+        p = Project(name="unknown")
+        db.session.add(p)
+        db.session.flush()
+        ps = ProjectSettings(id=p.id, max_class_nr=80)
+        db.session.add(ps)
+        db.session.commit()
+
+        # dummy data
+        pro = Project(name="project")
+        db.session.add(pro)
+        db.session.flush()
+        pros = ProjectSettings(id=pro.id, max_class_nr=80)
+        db.session.add(pros)
+        db.session.commit()
+
+        p1 = Project(name="test1")
+        p2 = Project(name="test2")
         db.session.add_all([p1, p2])
         db.session.flush()
+        ps1 = ProjectSettings(id=p1.id, max_class_nr=80)
+        ps2 = ProjectSettings(id=p2.id, max_class_nr=80)
+        db.session.add_all([ps1, ps2])
+        db.session.flush()
 
-        i1 = Image(image=os.urandom(100), height=1, width=1, project_id=p1.id, batch_id=1)
-        i2 = Image(image=os.urandom(200), height=2, width=2, project_id=p2.id, batch_id=1)
-        i3 = Image(image=os.urandom(200), height=2, width=2, project_id=p2.id, batch_id=2)
+        i1 = Image(image=os.urandom(100), height=1, width=1, project_id=p1.id)
+        i2 = Image(image=os.urandom(200), height=2, width=2, project_id=p2.id)
+        i3 = Image(image=os.urandom(200), height=2, width=2, project_id=p2.id)
         db.session.add_all([i1, i2, i3])
         db.session.flush()
 
@@ -93,24 +114,24 @@ with app.app_context():
         db.session.flush()
 
         a = Annotator.query.filter_by(name="human").first()
-        a1 = Annotation(project_id=p1.id, image_id=i1.id, annotator_id=a.id, x_center=0, y_center=0, width=0, height=0, class_id=0, batch_id=1)
-        a2 = Annotation(project_id=p1.id, image_id=i1.id, annotator_id=a.id, x_center=0, y_center=0, width=0, height=0, class_id=0, batch_id=2)
-        a3 = Annotation(project_id=p2.id, image_id=i2.id, annotator_id=a.id, x_center=0, y_center=0, width=0, height=0, class_id=0, batch_id=1)
+        a1 = Annotation(project_id=p1.id, image_id=i1.id, annotator_id=a.id, x_center=0, y_center=0, width=0, height=0, class_id=0)
+        a2 = Annotation(project_id=p1.id, image_id=i1.id, annotator_id=a.id, x_center=0, y_center=0, width=0, height=0, class_id=0)
+        a3 = Annotation(project_id=p2.id, image_id=i2.id, annotator_id=a.id, x_center=0, y_center=0, width=0, height=0, class_id=0)
         db.session.add_all([a1, a2, a3])
         db.session.flush()
 
         ms = ModelStatus.query.filter_by(name="idle").first()
-        m1 = Model(model_status_id=ms.id, latest_batch=1, project_id=p1.id)
-        m2 = Model(model_status_id=ms.id, latest_batch=2, project_id=p1.id)
+        m1 = Model(model_status_id=ms.id, project_id=p1.id)
+        m2 = Model(model_status_id=ms.id, project_id=p1.id)
         db.session.add_all([m1, m2])
         db.session.flush()
 
-        # mi1 = ModelImage(model_id=m1.id, image_id=m1.id)
-        # mi2 = ModelImage(model_id=m1.id, image_id=m2.id)
-        # mi3 = ModelImage(model_id=m2.id, image_id=m1.id)
-        # mi4 = ModelImage(model_id=m2.id, image_id=m2.id)
-        # db.session.add_all([mi1, mi2, mi3, mi4])
-        # db.session.flush()
+        mi1 = ModelImage(model_id=m1.id, image_id=m1.id)
+        mi2 = ModelImage(model_id=m1.id, image_id=m2.id)
+        mi3 = ModelImage(model_id=m2.id, image_id=m1.id)
+        mi4 = ModelImage(model_id=m2.id, image_id=m2.id)
+        db.session.add_all([mi1, mi2, mi3, mi4])
+        db.session.flush()
 
         mr1 = ModelResults(model_id=m1.id)
         mr2 = ModelResults(model_id=m1.id)
@@ -118,10 +139,9 @@ with app.app_context():
         db.session.add_all([mr1, mr2, mr3])
         db.session.commit()
 
-
     if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
         scheduler = BackgroundScheduler()
-        scheduler.add_job(func=update_queue, trigger="interval", seconds=60)
+        scheduler.add_job(func=update_queue, trigger="interval", seconds=10)
         scheduler.start()
         atexit.register(lambda: scheduler.shutdown())
 
