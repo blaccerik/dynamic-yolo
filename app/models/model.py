@@ -12,7 +12,7 @@ class Model(db.Model):
 
     latest_batch = Column(BigInteger, nullable=False)
 
-    project_id = Column(BigInteger, ForeignKey("project.id"), nullable=False)
+    project_id = Column(BigInteger, ForeignKey("project.id", name="fk_project"), nullable=False)
 
     model_results_id = relationship("ModelResults", backref="model")
     parent = relationship('Model', remote_side=[id])
