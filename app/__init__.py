@@ -48,7 +48,7 @@ with app.app_context():
     # _read_names(db)
 
     print(db.engine.table_names())
-    recreate = True
+    recreate = False
     # inspector = inspect(db.engine)
     # has_table = inspector.has_table("user")
     if recreate:
@@ -73,6 +73,21 @@ with app.app_context():
         a2.name = "human"
         db.session.add(a1)
         db.session.add(a2)
+        db.session.commit()
+
+        p = Project(name="unknown")
+        db.session.add(p)
+        db.session.flush()
+        ps = ProjectSettings(id=p.id, max_class_nr=80)
+        db.session.add(ps)
+        db.session.commit()
+
+        # dummy data
+        pro = Project(name="project")
+        db.session.add(pro)
+        db.session.flush()
+        pros = ProjectSettings(id=pro.id, max_class_nr=80)
+        db.session.add(pros)
         db.session.commit()
 
         p1 = Project(name="test1")
@@ -124,10 +139,9 @@ with app.app_context():
         db.session.add_all([mr1, mr2, mr3])
         db.session.commit()
 
-
     if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
         scheduler = BackgroundScheduler()
-        scheduler.add_job(func=update_queue, trigger="interval", seconds=60)
+        scheduler.add_job(func=update_queue, trigger="interval", seconds=10)
         scheduler.start()
         atexit.register(lambda: scheduler.shutdown())
 
