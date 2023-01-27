@@ -45,7 +45,14 @@ from app.views import upload_classes
 from app.queue_manager import update_queue
 
 with app.app_context():
-    # _read_names(db)
+    # check if yolo folders are created
+    path = "app/yolo/data"
+    needed = ["images", "labels", "model", "results", "test"]
+    for i in os.listdir(path):
+        if i in needed:
+            needed.remove(i)
+    for i in needed:
+        os.mkdir(os.path.join(path, i))
 
     print(db.engine.table_names())
     recreate = False
