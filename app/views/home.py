@@ -21,13 +21,13 @@ def train():
     start_training(2)
     return "done"
 
-@app.route('/train2')
-def train2():
-    project = Project.query.get(2)
-    ts = TrainSession(project)
-    ts.load_data()
-    ts.train()
-    return "done"
+# @app.route('/train2')
+# def train2():
+#     project = Project.query.get(2)
+#     ts = TrainSession(project)
+#     ts.load_data()
+#     ts.train()
+#     return "done"
 
 
 @app.route('/queue')
