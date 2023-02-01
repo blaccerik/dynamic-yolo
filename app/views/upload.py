@@ -1,16 +1,18 @@
+
 from io import BytesIO
 
-from flask import render_template, request
+from flask import render_template, request, Blueprint
 
 from werkzeug.utils import secure_filename
 
-from app import app
 from app.api import upload_files
 from app.forms import UploadFileForm
 from app.models.annotation import Annotation
 from app.models.image import Image
 
 import PIL.Image
+
+mod = Blueprint('upload',__name__)
 
 image_types = [
     "image/jpeg",
@@ -61,7 +63,7 @@ def _filestorage_to_db_item(f):
         return (Image(image=content, width=img.size[0], height=img.size[1]), name),
 
 
-@app.route('/upload', methods=["GET", "POST"])
+@mod.route('/upload', methods=["GET", "POST"])
 def upload():
     form = UploadFileForm()
     if form.validate_on_submit():

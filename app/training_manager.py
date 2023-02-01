@@ -1,9 +1,5 @@
 import logging
 import os
-from io import BytesIO
-
-import PIL
-import torch
 import yaml
 
 from app import db

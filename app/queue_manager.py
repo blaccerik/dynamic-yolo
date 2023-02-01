@@ -1,6 +1,6 @@
 from sqlalchemy import func, asc
 
-from app import db, app
+from app import db
 from app.models.project import Project
 from app.models.queue import Queue
 from app.training_manager import start_training
@@ -11,24 +11,24 @@ def update_queue():
     Call this function to check for updates in the queue
     :return:
     """
-    with app.app_context():
-        queue = Queue.query.order_by(asc(Queue.position)).all()
 
-        # check if anything is in the queue
-        if len(queue) == 0:
-            return
-        first = queue.pop(0)
-        project_id = first.project_id
+    queue = Queue.query.order_by(asc(Queue.position)).all()
 
-        start_training(project_id)
+    # check if anything is in the queue
+    if len(queue) == 0:
+        return
+    first = queue.pop(0)
+    project_id = first.project_id
 
-        # update queue
-        db.session.delete(first)
-        db.session.commit()
-        for q in queue:
-            q.position = q.position - 1
-            db.session.add(q)
-        db.session.commit()
+    start_training(project_id)
+
+    # update queue
+    db.session.delete(first)
+    db.session.commit()
+    for q in queue:
+        q.position = q.position - 1
+        db.session.add(q)
+    db.session.commit()
 
 
 def add_to_queue(project_id: int):
