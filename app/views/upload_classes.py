@@ -1,10 +1,9 @@
-from flask import render_template, request
-from app import app
+from flask import render_template, request, Blueprint
 from app.forms import UploadClassFileForm
 from app.api import upload_classes_to_db
 
-
-@app.route('/upload_classes', methods=["GET", "POST"])
+mod = Blueprint('upload_classes',__name__)
+@mod.route('/upload_classes', methods=["GET", "POST"])
 def upload_classes():
     form = UploadClassFileForm()
     if form.validate_on_submit():
