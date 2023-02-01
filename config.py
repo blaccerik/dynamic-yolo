@@ -5,9 +5,9 @@ BASEDIR = os.path.abspath(os.path.dirname(__file__))
 
 
 class Config(object):
-    FLASK_ENV = 'development'
-    DEBUG = False
-    TESTING = False
+    # ENV = 'development'
+    # DEBUG = True
+    # TESTING = False
     SECRET_KEY = os.getenv('SECRET_KEY')
     SQLALCHEMY_DATABASE_URI = \
         f"postgresql://{os.environ['DB_USERNAME']}:{os.environ['DB_PASSWORD']}@localhost/{os.environ['DB_NAME']}"
@@ -15,12 +15,16 @@ class Config(object):
 
 
 class ProductionConfig(Config):
-    FLASK_ENV = 'production'
+    # ENV = 'production'
+    pass
 
 
 class DevelopmentConfig(Config):
     print('development mode')
-    DEBUG = False
+    ENV = 'development'
+    FLASK_DEBUG = True
+    DEBUG = True
+    # TEMPLATES_AUTO_RELOAD = True
     #change to true later
 
 
