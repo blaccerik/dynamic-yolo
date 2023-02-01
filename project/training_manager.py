@@ -1,22 +1,18 @@
 import logging
 import os
 import shutil
-from io import BytesIO
-
-import PIL
-import torch
 import yaml
 
-from app import db
-from app.models.annotation import Annotation
-from app.models.image import Image
-from app.models.image_class import ImageClass
-from app.models.model import Model
-from app.models.model_image import ModelImage
-from app.models.model_status import ModelStatus
-from app.models.project import Project
-from app.models.project_settings import ProjectSettings
-from app.yolo.yolov5 import train, detect
+from project import db
+from project.models.annotation import Annotation
+from project.models.image import Image
+from project.models.image_class import ImageClass
+from project.models.model import Model
+from project.models.model_image import ModelImage
+from project.models.model_status import ModelStatus
+from project.models.project import Project
+from project.models.project_settings import ProjectSettings
+from project.yolo.yolov5 import detect, train
 
 
 class TrainSession:
