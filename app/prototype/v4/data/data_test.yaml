@@ -1,0 +1,33 @@
+names:
+  0: pedestrian
+  1: people
+  2: van
+  3: truck
+  4: tricycle
+  5: awning-tricycle
+  6: motor
+  7: aeroplane
+  8: bird
+  9: boat
+  10: bottle
+  11: cat
+  12: chair
+  13: cow
+  14: diningtable
+  15: dog
+  16: horse
+  17: motorbike
+  18: person
+  19: pottedplant
+  20: sheep
+  21: sofa
+  22: train
+  23: tvmonitor
+path: ../data
+train:
+  - dataset1/train
+val:
+  - dataset1/train
+test:
+  - dataset1/test
+  - dataset2/test
