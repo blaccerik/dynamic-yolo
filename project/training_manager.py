@@ -7,6 +7,7 @@ from project import db
 from project.models.annotation import Annotation
 from project.models.image import Image
 from project.models.image_class import ImageClass
+from project.models.image_subset import ImageSubset
 from project.models.model import Model
 from project.models.model_image import ModelImage
 from project.models.model_status import ModelStatus
@@ -20,12 +21,13 @@ class TrainSession:
         ms = ModelStatus.query.filter_by(name="training").first()
 
         # create new model
-        self.db_model = Model(model_status_id=ms.id, project_id=project.id)
+        self.db_model = Model(model_status_id=ms.id, project_id=project.id, epochs=project_settings.epochs)
 
         # todo read settings for start model
         # self.model_path = "project/yolo/yolov5/yolov5s.pt"
 
         model_id = project.latest_model_id
+        total = 0
         if model_id is not None:  # use prev model
             prev_model = Model.query.get(model_id)
             model = prev_model.model
@@ -33,6 +35,7 @@ class TrainSession:
             if model is None: # model "exists" but weights are none
                 self.new_model = True
             else:
+                total = prev_model.total_epochs
                 self.new_model = False
                 self.db_model.parent_model_id = model_id
 
@@ -41,6 +44,8 @@ class TrainSession:
                 self.model_path = "project/yolo/data/weights.pt"
         else:
             self.new_model = True
+
+        self.db_model.total_epochs = total + project_settings.epochs
 
         # update database
         self.project = project
@@ -56,39 +61,6 @@ class TrainSession:
         self.good_images = set()
 
         print(self.new_model)
-
-    # def test_prev_model(self):
-    #
-    #
-    #
-    #
-    #
-    #     # get only bad images
-    #     # if multiple directories then skip all
-    #     if os.path.exists("app/yolo/data/results/yolo_test"):
-    #         for path in os.listdir("app/yolo/data/results/yolo_test/labels"):
-    #             self._read_file(path, )
-    #
-    #     # clear images
-    #     for i in os.listdir("app/yolo/data/test"):
-    #         image = os.path.join("app/yolo/data/test", i)
-    #         os.remove(image)
-    #
-    #     # clear results
-    #     for directory in os.listdir("app/yolo/data/results"):
-    #         shutil.rmtree(os.path.join("app/yolo/data/results", directory))
-
-    # def _read_file(self, path):
-    #     image_file = os.path.join("app/yolo/data/results/yolo_test/labels", path)
-    #     with open(image_file, "r") as f:
-    #         for line in f.readlines():
-    #             class_nr, _, _, _, _, conf = line.strip().split(" ")
-    #             conf = float(conf)
-    #             if conf < self.project_settings.confidence_threshold:
-    #                 return
-    #         nr, _ = path.split(".")
-    #         nr = int(nr)
-    #         self.good_images.add(nr)
 
 
     def load_pretest(self):
@@ -110,7 +82,6 @@ class TrainSession:
         logging.getLogger("yolov5").setLevel(logging.WARNING)
 
         # load yolo settings
-        print("start pretest")
         opt = detect.parse_opt(True)
 
         setattr(opt, "weights", "project/yolo/data/weights.pt")
@@ -118,17 +89,16 @@ class TrainSession:
         setattr(opt, "nosave", True)
         setattr(opt, "save_txt", True)
         setattr(opt, "save_conf", True)
-        setattr(opt, "conf_thres", 0.02)
+        setattr(opt, "conf_thres", self.project_settings.min_confidence_threshold)
+        setattr(opt, "iou_thres", self.project_settings.min_iou_threshold)
 
         setattr(opt, "project", "project/yolo/data/pretest_results")
         setattr(opt, "name", "yolo_test")
 
         # run model
         detect.main(opt)
-        print("end pretest")
-        # read results
 
-        # update images
+        # read results
         for path in os.listdir("project/yolo/data/pretest_results/yolo_test/labels"):
             self._read_file(path)
 
@@ -166,9 +136,10 @@ class TrainSession:
             yaml.dump(data, outfile, default_flow_style=False)
 
     def load_data(self):
+        db_test_subset = ImageSubset.query.filter_by(name="test").first()
+        db_train_subset = ImageSubset.query.filter_by(name="train").first()
 
-
-        train_test_ratio = 0.75
+        train_test_ratio = self.project_settings.train_test_ratio
 
         # get images
         images = Image.query.filter(Image.project_id == self.project.id)
@@ -179,14 +150,15 @@ class TrainSession:
         count = 0
         threshold = train_test_ratio * len(images)
 
-        # todo store whether image is train or test
         for image in images:
 
             count += 1
             if count > threshold:
                 location = "project/yolo/data/test"
+                subset_id = db_test_subset.id
             else:
                 location = "project/yolo/data/train"
+                subset_id = db_train_subset.id
 
             annotations = Annotation.query.filter_by(project_id=self.project.id, image_id=image.id)
 
@@ -204,7 +176,7 @@ class TrainSession:
                 text_file.write(text)
 
             # create db entry
-            mi = ModelImage(model_id=self.db_model.id, image_id=image.id)
+            mi = ModelImage(model_id=self.db_model.id, image_id=image.id, image_subset_id=subset_id)
             db.session.add(mi)
         db.session.commit()
 
@@ -229,7 +201,8 @@ class TrainSession:
         setattr(opt, "name", "yolo_train")
 
         if self.new_model:
-            # todo read settings
+            # todo read settings for number of classes
+            #  and edit yaml file
             setattr(opt, "weights", "")
             setattr(opt, "cfg", "project/yolo/yolov5/models/yolov5s.yaml")
         else:
@@ -277,20 +250,7 @@ class TrainSession:
         # read results
 
     def cleanup(self):
-        pass
-        # # delete images from disk
-        # shutil.rmtree('project/yolo/data/train')
-        # shutil.rmtree('project/yolo/data/test')
-        # shutil.rmtree('project/yolo/data/model')
-        #
-        # # recreate folders
-        # os.mkdir("project/yolo/data/model")
-        # os.mkdir("project/yolo/data/train")
-        # os.mkdir("project/yolo/data/train/images")
-        # os.mkdir("project/yolo/data/train/labels")
-        # os.mkdir("project/yolo/data/test")
-        # os.mkdir("project/yolo/data/test/images")
-        # os.mkdir("project/yolo/data/test/labels")
+        shutil.rmtree("project/yolo/data")
 
 def initialize_yolo_folders():
     """
@@ -337,7 +297,8 @@ def start_training(project_id: int):
         return "project settings not found"
 
     # clear dirs
-    shutil.rmtree("project/yolo/data")
+    if os.path.exists("project/yolo/data"):
+        shutil.rmtree("project/yolo/data")
     initialize_yolo_folders()
 
     ts = TrainSession(project, project_settings)
@@ -348,4 +309,4 @@ def start_training(project_id: int):
     ts.load_data()
     ts.train()
     ts.test()
-    # ts.cleanup()
+    ts.cleanup()
