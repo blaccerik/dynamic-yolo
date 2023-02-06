@@ -12,7 +12,7 @@ from project.models.model_image import ModelImage
 from project.models.model_status import ModelStatus
 from project.models.project import Project
 from project.models.project_settings import ProjectSettings
-from project.yolo.yolov5 import val, train
+from project.yolo.yolov5 import val, train, detect
 
 
 class TrainSession:
@@ -20,32 +20,42 @@ class TrainSession:
         ms = ModelStatus.query.filter_by(name="training").first()
 
         # create new model
-        self.model = Model(model_status_id=ms.id, project_id=project.id)
+        self.db_model = Model(model_status_id=ms.id, project_id=project.id)
 
         # todo read settings for start model
         # self.model_path = "project/yolo/yolov5/yolov5s.pt"
 
         model_id = project.latest_model_id
         if model_id is not None:  # use prev model
-            self.new_model = False
-            self.model.parent_model_id = model_id
-            prev_model = Model.query.filter_by(id=model_id)
-            print(prev_model)
-            # write to file
-            path = "project/yolo/data/model"
+            prev_model = Model.query.get(model_id)
+            model = prev_model.model
+
+            if model is None: # model "exists" but weights are none
+                self.new_model = True
+            else:
+                self.new_model = False
+                self.db_model.parent_model_id = model_id
+
+                with open(f"project/yolo/data/weights.pt", "wb") as binary_file:
+                    binary_file.write(model)
+                self.model_path = "project/yolo/data/weights.pt"
         else:
             self.new_model = True
 
         # update database
         self.project = project
         self.project_settings = project_settings
-        db.session.add(self.model)
+
+        db.session.add(self.db_model)
         db.session.flush()
-        project.latest_model_id = self.model.id
+
+        project.latest_model_id = self.db_model.id
         db.session.add(project)
         db.session.commit()
 
         self.good_images = set()
+
+        print(self.new_model)
 
     # def test_prev_model(self):
     #
@@ -80,8 +90,61 @@ class TrainSession:
     #         nr = int(nr)
     #         self.good_images.add(nr)
 
-    def load_data(self):
 
+    def load_pretest(self):
+        if self.new_model:
+            return
+
+        # todo use db stream and dont write to disk
+        images = Image.query.filter(Image.project_id == self.project.id)
+        for image in images:
+            content = image.image
+            with open(f"project/yolo/data/pretest_images/{image.id}.png", "wb") as binary_file:
+                binary_file.write(content)
+
+    def pretest(self):
+        if self.new_model:
+            return
+
+        # set logging to warning to see much less info at console
+        logging.getLogger("yolov5").setLevel(logging.WARNING)
+
+        # load yolo settings
+        print("start pretest")
+        opt = detect.parse_opt(True)
+
+        setattr(opt, "weights", "project/yolo/data/weights.pt")
+        setattr(opt, "source", "project/yolo/data/pretest_images")
+        setattr(opt, "nosave", True)
+        setattr(opt, "save_txt", True)
+        setattr(opt, "save_conf", True)
+        setattr(opt, "conf_thres", 0.02)
+
+        setattr(opt, "project", "project/yolo/data/pretest_results")
+        setattr(opt, "name", "yolo_test")
+
+        # run model
+        detect.main(opt)
+        print("end pretest")
+        # read results
+
+        # update images
+        for path in os.listdir("project/yolo/data/pretest_results/yolo_test/labels"):
+            self._read_file(path)
+
+    def _read_file(self, path):
+        image_file = os.path.join("project/yolo/data/pretest_results/yolo_test/labels", path)
+        with open(image_file, "r") as f:
+            for line in f.readlines():
+                class_nr, _, _, _, _, conf = line.strip().split(" ")
+                conf = float(conf)
+                if conf < self.project_settings.confidence_threshold:
+                    return
+            nr, _ = path.split(".")
+            nr = int(nr)
+            self.good_images.add(nr)
+
+    def load_yaml(self):
         # create yaml file
         data = {
             "path": "../data",
@@ -102,14 +165,8 @@ class TrainSession:
         with open('project/yolo/data/data.yaml', 'w') as outfile:
             yaml.dump(data, outfile, default_flow_style=False)
 
-        # if is new model then skip loading its data
-        if not self.new_model:
-            # todo use db stream and dont write to disk
-            images = Image.query.filter(Image.project_id == self.project.id)
-            for image in images:
-                content = image.image
-                with open(f"project/yolo/data/pretest/{image.id}.png", "wb") as binary_file:
-                    binary_file.write(content)
+    def load_data(self):
+
 
         train_test_ratio = 0.75
 
@@ -118,7 +175,7 @@ class TrainSession:
 
         # filter out "good" images
         images = [image for image in images if image.id not in self.good_images]
-
+        print(len(images), len(self.good_images))
         count = 0
         threshold = train_test_ratio * len(images)
 
@@ -147,9 +204,10 @@ class TrainSession:
                 text_file.write(text)
 
             # create db entry
-            mi = ModelImage(model_id=self.model.id, image_id=image.id)
+            mi = ModelImage(model_id=self.db_model.id, image_id=image.id)
             db.session.add(mi)
         db.session.commit()
+
 
     def train(self):
 
@@ -175,30 +233,37 @@ class TrainSession:
             setattr(opt, "weights", "")
             setattr(opt, "cfg", "project/yolo/yolov5/models/yolov5s.yaml")
         else:
-            setattr(opt, "weights", "")
+            setattr(opt, "weights", self.model_path)
             setattr(opt, "cfg", "")
 
         train.main(opt)  # long process
 
+        # read model weights
+        with open("project/yolo/data/model/yolo_train/weights/best.pt", "rb") as f:
+            content = f.read()
+            self.db_model.model = content
+
+
         # update database
         ms = ModelStatus.query.filter_by(name="ready").first()
-        self.model.model_status_id = ms.id
-        db.session.add(self.model)
+        self.db_model.model_status_id = ms.id
+        db.session.add(self.db_model)
         db.session.commit()
 
-        self.new_model = False
-
     def test(self):
-        if self.new_model:
-            return
+
+        # set logging to warning to see much less info at console
+        logging.getLogger("yolov5").setLevel(logging.WARNING)
 
         # load yolo settings
         opt = val.parse_opt(True)
 
         # todo use prev model
-        setattr(opt, "weights", "project/yolo/data/best.pt")
+        setattr(opt, "weights", "project/yolo/data/model/yolo_train/weights/best.pt")
         setattr(opt, "data", "project/yolo/data/data.yaml")
         setattr(opt, "task", "test")
+        setattr(opt, "project", "project/yolo/data/results")
+        setattr(opt, "name", "yolo_test")
         # setattr(opt, "source", "app/yolo/data/test")
         # setattr(opt, "nosave", True)
         # setattr(opt, "project", "app/yolo/data/results")
@@ -210,7 +275,6 @@ class TrainSession:
         val.main(opt)
 
         # read results
-
 
     def cleanup(self):
         pass
@@ -228,6 +292,37 @@ class TrainSession:
         # os.mkdir("project/yolo/data/test/images")
         # os.mkdir("project/yolo/data/test/labels")
 
+def initialize_yolo_folders():
+    """
+    yolo:
+      data:
+        train:
+          images
+          labels
+        test:
+          images
+          labels
+        results
+        pretest
+        model
+    """
+    create_path("project/yolo/data")
+    create_path("project/yolo/data/train")
+    create_path("project/yolo/data/train/images")
+    create_path("project/yolo/data/train/labels")
+    create_path("project/yolo/data/test")
+    create_path("project/yolo/data/test/images")
+    create_path("project/yolo/data/test/labels")
+
+    create_path("project/yolo/data/pretest_images")
+    create_path("project/yolo/data/pretest_results")
+
+    create_path("project/yolo/data/results")
+    create_path("project/yolo/data/model")
+
+def create_path(path):
+    if not os.path.exists(path):
+        os.mkdir(path)
 
 
 def start_training(project_id: int):
@@ -240,9 +335,17 @@ def start_training(project_id: int):
     project_settings = ProjectSettings.query.get(project_id)
     if project_settings is None:
         return "project settings not found"
+
+    # clear dirs
+    shutil.rmtree("project/yolo/data")
+    initialize_yolo_folders()
+
     ts = TrainSession(project, project_settings)
-    ts.test()
+
+    ts.load_pretest()
+    ts.pretest()
+    ts.load_yaml()
     ts.load_data()
     ts.train()
     ts.test()
-    ts.cleanup()
+    # ts.cleanup()

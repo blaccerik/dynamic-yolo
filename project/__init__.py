@@ -27,7 +27,6 @@ def create_app(config_filename=None):
     #     print(i, project.config[i])
     initialize_extensions(app)
     register_blueprints(app)
-    initialize_yolo_folders()
 
     if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
         from project.queue_manager import update_queue
@@ -44,37 +43,6 @@ def create_app(config_filename=None):
 # ----------------
 # Helper Functions
 # ----------------
-
-
-def create_path(path):
-    if not os.path.exists(path):
-        os.mkdir(path)
-
-def initialize_yolo_folders():
-    """
-    yolo:
-      data:
-        train:
-          images
-          labels
-        test:
-          images
-          labels
-        results
-        pretest
-        model
-    """
-    create_path("project/yolo/data")
-    create_path("project/yolo/data/train")
-    create_path("project/yolo/data/train/images")
-    create_path("project/yolo/data/train/labels")
-    create_path("project/yolo/data/test")
-    create_path("project/yolo/data/test/images")
-    create_path("project/yolo/data/test/labels")
-    create_path("project/yolo/data/results")
-    create_path("project/yolo/data/pretest")
-    create_path("project/yolo/data/model")
-
 
 def initialize_extensions(app):
     db.init_app(app)

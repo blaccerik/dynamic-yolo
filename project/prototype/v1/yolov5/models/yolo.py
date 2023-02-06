@@ -153,7 +153,7 @@ class BaseModel(nn.Module):
     def _apply(self, fn):
         # Apply to(), cpu(), cuda(), half() to model tensors that are not parameters or registered buffers
         self = super()._apply(fn)
-        m = self.model[-1]  # Detect()
+        m = self.db_model[-1]  # Detect()
         if isinstance(m, (Detect, Segment)):
             m.stride = fn(m.stride)
             m.grid = list(map(fn, m.grid))
@@ -279,7 +279,7 @@ class ClassificationModel(BaseModel):
     def _from_detection_model(self, model, nc=1000, cutoff=10):
         # Create a YOLOv5 classification model from a YOLOv5 detection model
         if isinstance(model, DetectMultiBackend):
-            model = model.model  # unwrap DetectMultiBackend
+            model = model.db_model  # unwrap DetectMultiBackend
         model.model = model.model[:cutoff]  # backbone
         m = model.model[-1]  # last layer
         ch = m.conv.in_channels if hasattr(m, 'conv') else m.cv1.conv.in_channels  # ch into module
