@@ -11,4 +11,9 @@ class ProjectSettings(db.Model):
     epochs = Column(Integer, nullable=False, default=3)
     batch_size = Column(Integer, nullable=False, default=8)
     img_size = Column(Integer, nullable=False, default=640)
-    confidence_threshold = Column(Float, nullable=False, default=0.95)
+    confidence_threshold = Column(Float, nullable=False, default=0.95) # how confident model needs to be to skip image
+    train_test_ratio = Column(Float, nullable=False, default=0.75)
+
+    # min confidence for model to read image section as detection
+    min_confidence_threshold = Column(Float, nullable=False, default=0.25)
+    min_iou_threshold = Column(Float, nullable=False, default=0.45)

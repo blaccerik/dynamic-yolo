@@ -19,6 +19,10 @@ def update_queue(app):
         first = queue.pop(0)
         project_id = first.project_id
 
+        # todo if training and new files are uploaded then they are not used in this training session
+        #  nor the next one as the queue entry is deleted
+        #  queue should be deleted right away
+
         start_training(project_id)
 
         # update queue

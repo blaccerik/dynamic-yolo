@@ -57,6 +57,7 @@ def initialize_extensions(app):
     from project.models.model_results import ModelResults
     from project.models.project_settings import ProjectSettings
     from project.models.model_image import ModelImage
+    from project.models.image_subset import ImageSubset
 
     # Check if the database needs to be initialized
     recreate = False
@@ -71,7 +72,7 @@ def initialize_extensions(app):
             s2 = ModelStatus()
             s2.name = "ready"
             s3 = ModelStatus()
-            s3.name = "idle"
+            s3.name = "testing"
             db.session.add(s1)
             db.session.add(s2)
             db.session.add(s3)
@@ -83,6 +84,14 @@ def initialize_extensions(app):
             a2.name = "human"
             db.session.add(a1)
             db.session.add(a2)
+            db.session.commit()
+
+            is1 = ImageSubset()
+            is1.name = "train"
+            is2 = ImageSubset()
+            is2.name = "test"
+            db.session.add(is1)
+            db.session.add(is2)
             db.session.commit()
 
             p = Project(name="unknown")
