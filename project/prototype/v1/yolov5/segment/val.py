@@ -170,7 +170,7 @@ def run(
         device, pt, jit, engine = next(model.parameters()).device, True, False, False  # get model device, PyTorch model
         half &= device.type != 'cpu'  # half precision only supported on CUDA
         model.half() if half else model.float()
-        nm = de_parallel(model).model[-1].nm  # number of masks
+        nm = de_parallel(model).db_model[-1].nm  # number of masks
     else:  # called directly
         device = select_device(device, batch_size=batch_size)
 
@@ -183,7 +183,7 @@ def run(
         stride, pt, jit, engine = model.stride, model.pt, model.jit, model.engine
         imgsz = check_img_size(imgsz, s=stride)  # check image size
         half = model.fp16  # FP16 supported on limited backends with CUDA
-        nm = de_parallel(model).model.model[-1].nm if isinstance(model, SegmentationModel) else 32  # number of masks
+        nm = de_parallel(model).db_model.db_model[-1].nm if isinstance(model, SegmentationModel) else 32  # number of masks
         if engine:
             batch_size = model.batch_size
         else:

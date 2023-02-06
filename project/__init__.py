@@ -28,12 +28,6 @@ def create_app(config_filename=None):
     initialize_extensions(app)
     register_blueprints(app)
 
-    # Check if the database needs to be initialized
-    recreate = False
-    if recreate:
-        db.drop_all()
-        db.create_all()
-
     if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
         from project.queue_manager import update_queue
 
@@ -63,6 +57,48 @@ def initialize_extensions(app):
     from project.models.model_results import ModelResults
     from project.models.project_settings import ProjectSettings
     from project.models.model_image import ModelImage
+
+    # Check if the database needs to be initialized
+    recreate = False
+    if recreate:
+        with app.app_context():
+            db.drop_all()
+            db.create_all()
+
+            # static data
+            s1 = ModelStatus()
+            s1.name = "training"
+            s2 = ModelStatus()
+            s2.name = "ready"
+            s3 = ModelStatus()
+            s3.name = "idle"
+            db.session.add(s1)
+            db.session.add(s2)
+            db.session.add(s3)
+            db.session.commit()
+
+            a1 = Annotator()
+            a1.name = "model"
+            a2 = Annotator()
+            a2.name = "human"
+            db.session.add(a1)
+            db.session.add(a2)
+            db.session.commit()
+
+            p = Project(name="unknown")
+            db.session.add(p)
+            db.session.flush()
+            ps = ProjectSettings(id=p.id, max_class_nr=80)
+            db.session.add(ps)
+            db.session.commit()
+
+            # dummy data
+            pro = Project(name="project")
+            db.session.add(pro)
+            db.session.flush()
+            pros = ProjectSettings(id=pro.id, max_class_nr=80)
+            db.session.add(pros)
+            db.session.commit()
 
 
 def register_blueprints(app):

@@ -639,7 +639,7 @@ class AutoShape(nn.Module):
         self.pt = not self.dmb or model.pt  # PyTorch model
         self.model = model.eval()
         if self.pt:
-            m = self.model.model.model[-1] if self.dmb else self.model.model[-1]  # Detect()
+            m = self.model.db_model.db_model[-1] if self.dmb else self.model.db_model[-1]  # Detect()
             m.inplace = False  # Detect.inplace=False for safe multithread inference
             m.export = True  # do not output loss values
 
@@ -647,7 +647,7 @@ class AutoShape(nn.Module):
         # Apply to(), cpu(), cuda(), half() to model tensors that are not parameters or registered buffers
         self = super()._apply(fn)
         if self.pt:
-            m = self.model.model.model[-1] if self.dmb else self.model.model[-1]  # Detect()
+            m = self.db_model.db_model.db_model[-1] if self.dmb else self.db_model.db_model[-1]  # Detect()
             m.stride = fn(m.stride)
             m.grid = list(map(fn, m.grid))
             if isinstance(m.anchor_grid, list):

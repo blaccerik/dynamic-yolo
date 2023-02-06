@@ -420,8 +420,8 @@ def parse_model(d, ch, model, imgsz):  # model_dict, input_channels(3)
             c2 = ch[f]
 
         tf_m = eval('TF' + m_str.replace('nn.', ''))
-        m_ = keras.Sequential([tf_m(*args, w=model.model[i][j]) for j in range(n)]) if n > 1 \
-            else tf_m(*args, w=model.model[i])  # module
+        m_ = keras.Sequential([tf_m(*args, w=model.db_model[i][j]) for j in range(n)]) if n > 1 \
+            else tf_m(*args, w=model.db_model[i])  # module
 
         torch_m_ = nn.Sequential(*(m(*args) for _ in range(n))) if n > 1 else m(*args)  # module
         t = str(m)[8:-2].replace('__main__.', '')  # module type
