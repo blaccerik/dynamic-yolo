@@ -19,8 +19,8 @@ def create_app(config_filename=None):
     app = Flask(__name__)
 
     # Configure the Flask application
-    config_type = os.getenv('CONFIG_TYPE', default='config.DevelopmentConfig')
-    app.config.from_object('config.DevelopmentConfig')
+    #config_type = os.getenv('CONFIG_TYPE', default='config.DevelopmentConfig')
+    app.config.from_object(config_filename)
     # project.debug = True
     # print(project.config)
     # for i in project.config:
