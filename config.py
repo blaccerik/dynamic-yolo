@@ -29,7 +29,9 @@ class DevelopmentConfig(Config):
 
 
 class TestingConfig(Config):
+    print('testing environment setup')
     TESTING = True
     SQLALCHEMY_DATABASE_URI = \
+        SQLALCHEMY_DATABASE_URI = \
         f"postgresql://{os.environ['DB_USERNAME']}:{os.environ['DB_PASSWORD']}@localhost/{os.environ['TEST_DB_NAME']}"
     WTF_CSRF_ENABLED = False
