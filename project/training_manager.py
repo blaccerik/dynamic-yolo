@@ -18,18 +18,20 @@ from project.yolo.yolov5 import val, train, detect
 
 class TrainSession:
     def __init__(self, project: Project, project_settings: ProjectSettings):
-        ms = ModelStatus.query.filter_by(name="training").first()
+        self.ms_train = ModelStatus.query.filter(ModelStatus.name.like("training")).first()
+        self.ms_test = ModelStatus.query.filter(ModelStatus.name.like("testing")).first()
+        self.ms_ready = ModelStatus.query.filter(ModelStatus.name.like("ready")).first()
 
         # create new model
-        self.db_model = Model(model_status_id=ms.id, project_id=project.id, epochs=project_settings.epochs)
+        self.db_model = Model(model_status_id=self.ms_test.id, project_id=project.id, epochs=project_settings.epochs)
 
         # todo read settings for start model
         # self.model_path = "project/yolo/yolov5/yolov5s.pt"
 
-        model_id = project.latest_model_id
         total = 0
-        if model_id is not None:  # use prev model
-            prev_model = Model.query.get(model_id)
+        prev_model_id = project.latest_model_id
+        if prev_model_id is not None:  # use prev model
+            prev_model = Model.query.get(prev_model_id)
             model = prev_model.model
 
             if model is None: # model "exists" but weights are none
@@ -37,7 +39,7 @@ class TrainSession:
             else:
                 total = prev_model.total_epochs
                 self.new_model = False
-                self.db_model.parent_model_id = model_id
+                self.db_model.parent_model_id = prev_model_id
 
                 with open(f"project/yolo/data/weights.pt", "wb") as binary_file:
                     binary_file.write(model)
@@ -48,19 +50,18 @@ class TrainSession:
         self.db_model.total_epochs = total + project_settings.epochs
 
         # update database
-        self.project = project
-        self.project_settings = project_settings
-
         db.session.add(self.db_model)
         db.session.flush()
 
         project.latest_model_id = self.db_model.id
+
         db.session.add(project)
         db.session.commit()
 
-        self.good_images = set()
+        self.project = project
+        self.project_settings = project_settings
 
-        print(self.new_model)
+        self.good_images = set()
 
 
     def load_pretest(self):
@@ -151,7 +152,6 @@ class TrainSession:
         threshold = train_test_ratio * len(images)
 
         for image in images:
-
             count += 1
             if count > threshold:
                 location = "project/yolo/data/test"
@@ -182,6 +182,11 @@ class TrainSession:
 
 
     def train(self):
+
+        # update database
+        self.db_model.model_status_id = self.ms_train.id
+        db.session.add(self.db_model)
+        db.session.commit()
 
         # set logging to warning to see much less info at console
         logging.getLogger("yolov5").setLevel(logging.WARNING)
@@ -216,14 +221,12 @@ class TrainSession:
             content = f.read()
             self.db_model.model = content
 
+    def test(self):
 
         # update database
-        ms = ModelStatus.query.filter_by(name="ready").first()
-        self.db_model.model_status_id = ms.id
+        self.db_model.model_status_id = self.ms_test.id
         db.session.add(self.db_model)
         db.session.commit()
-
-    def test(self):
 
         # set logging to warning to see much less info at console
         logging.getLogger("yolov5").setLevel(logging.WARNING)
@@ -250,7 +253,12 @@ class TrainSession:
         # read results
 
     def cleanup(self):
-        shutil.rmtree("project/yolo/data")
+        if os.path.exists("project/yolo/data"):
+            shutil.rmtree("project/yolo/data")
+
+        self.db_model.model_status_id = self.ms_ready.id
+        db.session.add(self.db_model)
+        db.session.commit()
 
 def initialize_yolo_folders():
     """

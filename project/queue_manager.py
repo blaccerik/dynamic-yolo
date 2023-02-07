@@ -1,6 +1,10 @@
-from sqlalchemy import func, asc
+import time
+
+from sqlalchemy import func, asc, or_
 
 from project import db
+from project.models.model import Model
+from project.models.model_status import ModelStatus
 from project.models.project import Project
 from project.models.queue import Queue
 from project.training_manager import start_training
@@ -19,19 +23,33 @@ def update_queue(app):
         first = queue.pop(0)
         project_id = first.project_id
 
-        # todo if training and new files are uploaded then they are not used in this training session
-        #  nor the next one as the queue entry is deleted
-        #  queue should be deleted right away
+        ms1 = ModelStatus.query.filter(ModelStatus.name.like("training")).first()
+        ms2 = ModelStatus.query.filter(ModelStatus.name.like("testing")).first()
 
-        start_training(project_id)
+        # check if anything is training
+        m = Model.query.filter(
+            or_(
+                Model.model_status_id == ms1.id,
+                Model.model_status_id == ms2.id,
+            )
+        ).first()
+        # something is training/testing
+        if m is not None:
+            return
+
+        db.session.delete(first)
+        db.session.flush()
 
         # update queue
-        db.session.delete(first)
-        db.session.commit()
         for q in queue:
             q.position = q.position - 1
             db.session.add(q)
         db.session.commit()
+
+        # train
+        start_training(project_id)
+
+
 
 
 def add_to_queue(project_id: int):
