@@ -1,5 +1,4 @@
-from sqlalchemy import Integer, Column, Float, ForeignKey, VARCHAR, PrimaryKeyConstraint, UniqueConstraint, \
-    ForeignKeyConstraint, BigInteger
+from sqlalchemy import Integer, Column, Float, ForeignKey, BigInteger
 
 from project import db
 

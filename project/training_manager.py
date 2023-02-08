@@ -8,6 +8,7 @@ from project.models.annotation import Annotation
 from project.models.image import Image
 from project.models.image_class import ImageClass
 from project.models.image_subset import ImageSubset
+from project.models.initial_model import InitialModel
 from project.models.model import Model
 from project.models.model_image import ModelImage
 from project.models.model_status import ModelStatus
@@ -17,7 +18,7 @@ from project.yolo.yolov5 import val, train, detect
 
 
 class TrainSession:
-    def __init__(self, project: Project, project_settings: ProjectSettings):
+    def __init__(self, project: Project, project_settings: ProjectSettings, name: str):
         self.ms_train = ModelStatus.query.filter(ModelStatus.name.like("training")).first()
         self.ms_test = ModelStatus.query.filter(ModelStatus.name.like("testing")).first()
         self.ms_ready = ModelStatus.query.filter(ModelStatus.name.like("ready")).first()
@@ -62,6 +63,16 @@ class TrainSession:
         self.project_settings = project_settings
 
         self.good_images = set()
+
+        # modify yolo backbone
+        if self.new_model:
+            with open(f"project/yolo/yolov5/models/{name}.yaml", "r") as stream:
+                yaml_file = yaml.safe_load(stream)
+                yaml_file["nc"] = self.project_settings.max_class_nr
+
+            with open('project/yolo/data/backbone.yaml', 'w') as outfile:
+                yaml.dump(yaml_file, outfile, default_flow_style=False)
+
 
 
     def load_pretest(self):
@@ -180,7 +191,6 @@ class TrainSession:
             db.session.add(mi)
         db.session.commit()
 
-
     def train(self):
 
         # update database
@@ -206,10 +216,8 @@ class TrainSession:
         setattr(opt, "name", "yolo_train")
 
         if self.new_model:
-            # todo read settings for number of classes
-            #  and edit yaml file
             setattr(opt, "weights", "")
-            setattr(opt, "cfg", "project/yolo/yolov5/models/yolov5s.yaml")
+            setattr(opt, "cfg", "project/yolo/data/backbone.yaml")
         else:
             setattr(opt, "weights", self.model_path)
             setattr(opt, "cfg", "")
@@ -304,13 +312,18 @@ def start_training(project_id: int):
     if project_settings is None:
         return "project settings not found"
 
+    # check if backbone file is present
+    name = InitialModel.query.get(project_settings.initial_model_id).name
+    if not os.path.isfile(f"project/yolo/yolov5/models/{name}.yaml"):
+        return "yolo backbone yaml file not found"
+
+
     # clear dirs
     if os.path.exists("project/yolo/data"):
         shutil.rmtree("project/yolo/data")
     initialize_yolo_folders()
 
-    ts = TrainSession(project, project_settings)
-
+    ts = TrainSession(project, project_settings, name)
     ts.load_pretest()
     ts.pretest()
     ts.load_yaml()

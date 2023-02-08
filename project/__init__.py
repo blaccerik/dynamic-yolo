@@ -88,6 +88,14 @@ def initialize_extensions(app):
             db.session.commit()
 
 
+            im1 = InitialModel(name="yolov5n")
+            im2 = InitialModel(name="yolov5s")
+            im3 = InitialModel(name="yolov5m")
+            im4 = InitialModel(name="yolov5l")
+            im5 = InitialModel(name="yolov5x")
+            db.session.add_all([im1, im2, im3, im4, im5])
+            db.session.commit()
+
             p = Project(name="unknown")
             db.session.add(p)
             db.session.flush()
