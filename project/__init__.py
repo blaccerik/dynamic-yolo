@@ -28,11 +28,13 @@ def create_app(config_filename=None):
     initialize_extensions(app)
     register_blueprints(app)
 
+    # Check if the database needs to be initialized
+
     if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
         from project.queue_manager import update_queue
 
-        scheduler = BackgroundScheduler(job_defaults={'max_instances': 2})
-        scheduler.add_job(func=update_queue, args=[app], trigger="interval", seconds=5)
+        scheduler = BackgroundScheduler()
+        scheduler.add_job(func=update_queue, args=[app], trigger="interval", seconds=10)
         scheduler.start()
         atexit.register(lambda: scheduler.shutdown())
 
@@ -57,8 +59,6 @@ def initialize_extensions(app):
     from project.models.model_results import ModelResults
     from project.models.project_settings import ProjectSettings
     from project.models.model_image import ModelImage
-    from project.models.image_subset import ImageSubset
-    from project.models.initial_model import InitialModel
 
     # Check if the database needs to be initialized
     recreate = False
@@ -87,13 +87,6 @@ def initialize_extensions(app):
             db.session.add(a2)
             db.session.commit()
 
-            is1 = ImageSubset()
-            is1.name = "train"
-            is2 = ImageSubset()
-            is2.name = "test"
-            db.session.add(is1)
-            db.session.add(is2)
-            db.session.commit()
 
             im1 = InitialModel(name="yolov5n")
             im2 = InitialModel(name="yolov5s")
@@ -118,13 +111,6 @@ def initialize_extensions(app):
             db.session.add(pros)
             db.session.commit()
 
-            pro = Project(name="project2")
-            db.session.add(pro)
-            db.session.flush()
-            pros = ProjectSettings(id=pro.id, max_class_nr=80)
-            db.session.add(pros)
-            db.session.commit()
-
 
 def register_blueprints(app):
     from project.views import home
@@ -136,3 +122,4 @@ def register_blueprints(app):
     app.register_blueprint(upload.mod)
 
 # TODO Fix observer functionality
+# TODO Fix scheduler for queue updating
