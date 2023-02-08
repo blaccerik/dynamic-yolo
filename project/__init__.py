@@ -33,8 +33,8 @@ def create_app(config_filename=None):
     if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
         from project.queue_manager import update_queue
 
-        scheduler = BackgroundScheduler()
-        scheduler.add_job(func=update_queue, args=[app], trigger="interval", seconds=10)
+        scheduler = BackgroundScheduler(job_defaults={'max_instances': 2})
+        scheduler.add_job(func=update_queue, args=[app], trigger="interval", seconds=5)
         scheduler.start()
         atexit.register(lambda: scheduler.shutdown())
 
@@ -59,6 +59,8 @@ def initialize_extensions(app):
     from project.models.model_results import ModelResults
     from project.models.project_settings import ProjectSettings
     from project.models.model_image import ModelImage
+    from project.models.initial_model import InitialModel
+    from project.models.image_subset import ImageSubset
 
     # Check if the database needs to be initialized
     recreate = False
@@ -87,13 +89,17 @@ def initialize_extensions(app):
             db.session.add(a2)
             db.session.commit()
 
-
             im1 = InitialModel(name="yolov5n")
             im2 = InitialModel(name="yolov5s")
             im3 = InitialModel(name="yolov5m")
             im4 = InitialModel(name="yolov5l")
             im5 = InitialModel(name="yolov5x")
             db.session.add_all([im1, im2, im3, im4, im5])
+            db.session.commit()
+
+            iss1 = ImageSubset(name="test")
+            iss2 = ImageSubset(name="train")
+            db.session.add_all([iss1, iss2])
             db.session.commit()
 
             p = Project(name="unknown")
@@ -122,4 +128,3 @@ def register_blueprints(app):
     app.register_blueprint(upload.mod)
 
 # TODO Fix observer functionality
-# TODO Fix scheduler for queue updating

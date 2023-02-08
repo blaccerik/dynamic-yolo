@@ -11,6 +11,7 @@ from project.models.image_subset import ImageSubset
 from project.models.initial_model import InitialModel
 from project.models.model import Model
 from project.models.model_image import ModelImage
+from project.models.model_results import ModelResults
 from project.models.model_status import ModelStatus
 from project.models.project import Project
 from project.models.project_settings import ProjectSettings
@@ -91,7 +92,7 @@ class TrainSession:
             return
 
         # set logging to warning to see much less info at console
-        logging.getLogger("yolov5").setLevel(logging.WARNING)
+        logging.getLogger("yolov5").setLevel(logging.ERROR)
 
         # load yolo settings
         opt = detect.parse_opt(True)
@@ -199,7 +200,9 @@ class TrainSession:
         db.session.commit()
 
         # set logging to warning to see much less info at console
-        logging.getLogger("yolov5").setLevel(logging.WARNING)
+        # logging.getLogger("utils.general").setLevel(logging.WARNING)  # yolov5 logger
+        logging.getLogger("yolov5").setLevel(logging.ERROR)
+
 
         # train model with labeled images
         opt = train.parse_opt(True)
@@ -210,7 +213,7 @@ class TrainSession:
         setattr(opt, "img", self.project_settings.img_size)
         setattr(opt, "epochs", self.project_settings.epochs)
 
-        setattr(opt, "noval", True)  # validate only last epoch
+        # setattr(opt, "noval", True)  # validate only last epoch
         setattr(opt, "noplots", True)  # dont save plots
         setattr(opt, "project", "project/yolo/data/model")
         setattr(opt, "name", "yolo_train")
@@ -237,12 +240,11 @@ class TrainSession:
         db.session.commit()
 
         # set logging to warning to see much less info at console
-        logging.getLogger("yolov5").setLevel(logging.WARNING)
+        logging.getLogger("yolov5").setLevel(logging.ERROR)
 
         # load yolo settings
         opt = val.parse_opt(True)
 
-        # todo use prev model
         setattr(opt, "weights", "project/yolo/data/model/yolo_train/weights/best.pt")
         setattr(opt, "data", "project/yolo/data/data.yaml")
         setattr(opt, "task", "test")
@@ -256,13 +258,34 @@ class TrainSession:
         # setattr(opt, "save_conf", True)
 
         # run model
-        val.main(opt)
+        # todo dont save results
+        m, maps, t = val.run(**vars(opt))
+        # t holds speeds per image, [a, b, c]
+        # a - init time
+        # b - inference time
+        # c - nms time
+        metric_precision, metric_recall, metrics_map_50, metrics_map_50_95, val_box_loss, val_obj_loss, val_cls_loss = m
 
-        # read results
+        # # ap per class
+        # for index, value in enumerate(maps):
+        #     print(index, value)
+
+        # save results
+        mr = ModelResults()
+        mr.model_id = self.db_model.id
+        mr.metric_precision = metric_precision
+        mr.metric_recall = metric_recall
+        mr.metric_map_50 = metrics_map_50
+        mr.metric_map_50_95 = metrics_map_50_95
+        mr.val_box_loss = val_box_loss
+        mr.val_obj_loss = val_obj_loss
+        mr.val_cls_loss = val_cls_loss
+        db.session.add(mr)
+        db.session.commit()
 
     def cleanup(self):
-        if os.path.exists("project/yolo/data"):
-            shutil.rmtree("project/yolo/data")
+        # if os.path.exists("project/yolo/data"):
+        #     shutil.rmtree("project/yolo/data")
 
         self.db_model.model_status_id = self.ms_ready.id
         db.session.add(self.db_model)
