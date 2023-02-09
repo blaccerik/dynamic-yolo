@@ -4,8 +4,9 @@ from sqlalchemy.orm import relationship
 from project import db
 
 
-class ImageSubset(db.Model):
+class Subset(db.Model):
     id = Column(Integer, primary_key=True)
     name = Column(VARCHAR(128), nullable=False, unique=False)
 
-    model_images = relationship("ModelImage", backref="imagesubset")
+    model_images = relationship("ModelImage", backref="subset")
+    model_results = relationship("ModelResults", backref="subset")
