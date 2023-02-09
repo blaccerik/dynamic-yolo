@@ -15,8 +15,6 @@ class ModelTest(TestCase):
         db.create_all()
         create_database_for_testing(db)
         self.model = Model.query.first()
-        print(self.model.id)
-        print(self.model.epochs)
 
     def tearDown(self):
         db.session.remove()

@@ -73,7 +73,7 @@ def create_database_for_testing(db):
     db.session.add(pros)
     db.session.commit()
 
-    i1 = Image(image=os.urandom(100), height=1, width=1, project_id=p1.id)
+    i1 = Image(image=bytes(10), height=15, width=14, project_id=p1.id)
     i2 = Image(image=os.urandom(200), height=2, width=2, project_id=p2.id)
     i3 = Image(image=os.urandom(200), height=2, width=2, project_id=p2.id)
     db.session.add_all([i1, i2, i3])
