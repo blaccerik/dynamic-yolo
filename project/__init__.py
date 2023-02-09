@@ -5,8 +5,6 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 
-
-
 db = SQLAlchemy()
 
 
@@ -19,7 +17,7 @@ def create_app(config_filename=None):
     app = Flask(__name__)
 
     # Configure the Flask application
-    #config_type = os.getenv('CONFIG_TYPE', default='config.DevelopmentConfig')
+    # config_type = os.getenv('CONFIG_TYPE', default='config.DevelopmentConfig')
     app.config.from_object(config_filename)
     # project.debug = True
     # print(project.config)
@@ -38,9 +36,8 @@ def create_app(config_filename=None):
         scheduler.start()
         atexit.register(lambda: scheduler.shutdown())
 
-
-
     return app
+
 
 # ----------------
 # Helper Functions
@@ -59,6 +56,7 @@ def initialize_extensions(app):
     from project.models.model_results import ModelResults
     from project.models.project_settings import ProjectSettings
     from project.models.model_image import ModelImage
+    from project.models.initial_model import InitialModel
 
     # Check if the database needs to be initialized
     recreate = False
@@ -86,7 +84,6 @@ def initialize_extensions(app):
             db.session.add(a1)
             db.session.add(a2)
             db.session.commit()
-
 
             im1 = InitialModel(name="yolov5n")
             im2 = InitialModel(name="yolov5s")

@@ -3,6 +3,7 @@ from project.models.annotator import Annotator
 from project.models.image import Image
 from project.models.image_class import ImageClass
 from project.models.image_subset import ImageSubset
+from project.models.initial_model import InitialModel
 from project.models.model import Model
 from project.models.model_image import ModelImage
 from project.models.model_results import ModelResults
@@ -11,6 +12,7 @@ from project.models.project import Project
 from project.models.project_settings import ProjectSettings
 
 import os
+
 
 def create_database_for_testing(db):
     # static data
@@ -31,6 +33,14 @@ def create_database_for_testing(db):
     a2.name = "human"
     db.session.add(a1)
     db.session.add(a2)
+    db.session.commit()
+
+    im1 = InitialModel(name="yolov5n")
+    im2 = InitialModel(name="yolov5s")
+    im3 = InitialModel(name="yolov5m")
+    im4 = InitialModel(name="yolov5l")
+    im5 = InitialModel(name="yolov5x")
+    db.session.add_all([im1, im2, im3, im4, im5])
     db.session.commit()
 
     is1 = ImageSubset()
@@ -88,17 +98,17 @@ def create_database_for_testing(db):
     db.session.flush()
 
     ms = ModelStatus.query.filter_by(name="ready").first()
-    m1 = Model(model_status_id=ms.id, project_id=p1.id,total_epochs=3,epochs=3)
-    m2 = Model(model_status_id=ms.id, project_id=p1.id,total_epochs=100,epochs=100)
+    m1 = Model(model_status_id=ms.id, project_id=p1.id, total_epochs=3, epochs=3)
+    m2 = Model(model_status_id=ms.id, project_id=p1.id, total_epochs=100, epochs=100)
     db.session.add_all([m1, m2])
     db.session.flush()
 
     train_ss = ImageSubset.query.filter_by(name="train").first()
     test_ss = ImageSubset.query.filter_by(name="test").first()
-    mi1 = ModelImage(model_id=m1.id, image_id=m1.id,image_subset_id = train_ss.id)
-    mi2 = ModelImage(model_id=m1.id, image_id=m2.id,image_subset_id = train_ss.id)
-    mi3 = ModelImage(model_id=m2.id, image_id=m1.id,image_subset_id = test_ss.id)
-    mi4 = ModelImage(model_id=m2.id, image_id=m2.id,image_subset_id = test_ss.id)
+    mi1 = ModelImage(model_id=m1.id, image_id=m1.id, image_subset_id=train_ss.id)
+    mi2 = ModelImage(model_id=m1.id, image_id=m2.id, image_subset_id=train_ss.id)
+    mi3 = ModelImage(model_id=m2.id, image_id=m1.id, image_subset_id=test_ss.id)
+    mi4 = ModelImage(model_id=m2.id, image_id=m2.id, image_subset_id=test_ss.id)
     db.session.add_all([mi1, mi2, mi3, mi4])
     db.session.flush()
 

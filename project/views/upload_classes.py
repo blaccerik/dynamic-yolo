@@ -2,7 +2,9 @@ from flask import render_template, request, Blueprint
 from project.forms import UploadClassFileForm
 from project.api import upload_classes_to_db
 
-mod = Blueprint('upload_classes',__name__)
+mod = Blueprint('upload_classes', __name__)
+
+
 @mod.route('/upload_classes', methods=["GET", "POST"])
 def upload_classes():
     form = UploadClassFileForm()
