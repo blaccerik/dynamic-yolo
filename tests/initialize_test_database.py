@@ -10,7 +10,7 @@ from project.models.model_results import ModelResults
 from project.models.model_status import ModelStatus
 from project.models.project import Project
 from project.models.project_settings import ProjectSettings
-
+from project.models.queue import Queue
 import os
 
 
@@ -52,12 +52,16 @@ def create_database_for_testing(db):
     db.session.commit()
 
     p1 = Project(name="unknown")
+
     db.session.add(p1)
     db.session.flush()
     ps = ProjectSettings(id=p1.id, max_class_nr=80)
     db.session.add(ps)
     db.session.commit()
 
+    queue1 = Queue(position=1, project_id=1)
+    db.session.add(queue1)
+    db.session.commit()
     # dummy data
     p2 = Project(name="project")
     db.session.add(p2)
@@ -117,3 +121,5 @@ def create_database_for_testing(db):
     mr3 = ModelResults(model_id=m2.id)
     db.session.add_all([mr1, mr2, mr3])
     db.session.commit()
+
+    p1.latest_model_id = 1
