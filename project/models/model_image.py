@@ -10,4 +10,3 @@ class ModelImage(db.Model):
     __table_args__ = (
         PrimaryKeyConstraint("model_id", "image_id", name="unique"),
     )
-    subset_id = Column(Integer, ForeignKey("subset.id"), nullable=False)

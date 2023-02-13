@@ -2,13 +2,19 @@ from sqlalchemy import VARCHAR, Column, Integer, BigInteger, ForeignKey, UniqueC
 from sqlalchemy.orm import relationship
 
 from project import db
+from project.models.project_status import ProjectStatus
 
+
+def get_default_status_id():
+    return ProjectStatus.query.filter(ProjectStatus.name.like("idle")).first().id
 
 class Project(db.Model):
     id = Column(BigInteger, primary_key=True)
     name = Column(VARCHAR(128), nullable=False, unique=True)
 
     latest_model_id = Column(BigInteger, ForeignKey("model.id", name="fk_latest_model"), nullable=True)
+
+    project_status_id = Column(Integer, ForeignKey("project_status.id"), nullable=False, default=get_default_status_id)
 
     queue = relationship('Queue', backref='project', lazy=True, uselist=False)
     project_settings = relationship("ProjectSettings", backref='project', lazy=True, uselist=False)

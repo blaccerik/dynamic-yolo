@@ -1,18 +1,21 @@
 import logging
 import os
 import shutil
+
 import yaml
+from sqlalchemy import and_
 
 from project import db, APP_ROOT_PATH
 from project.models.annotation import Annotation
 from project.models.image import Image
 from project.models.image_class import ImageClass
+from project.models.model_status import ModelStatus
 from project.models.subset import Subset
 from project.models.initial_model import InitialModel
 from project.models.model import Model
 from project.models.model_image import ModelImage
 from project.models.model_results import ModelResults
-from project.models.model_status import ModelStatus
+from project.models.project_status import ProjectStatus
 from project.models.project import Project
 from project.models.project_settings import ProjectSettings
 
@@ -45,19 +48,16 @@ def add_results_to_db(results, maps, model_id, subset_id, epoch=None) -> ModelRe
 from project.yolo.yolov5 import val, train, detect
 
 class TrainSession:
-    def __init__(self, project: Project, project_settings: ProjectSettings, name: str):
+    def __init__(self, project: Project, project_settings: ProjectSettings, name: str, ss_test_id: int, ss_train_id: int):
         self.ms_train = ModelStatus.query.filter(ModelStatus.name.like("training")).first()
         self.ms_test = ModelStatus.query.filter(ModelStatus.name.like("testing")).first()
         self.ms_ready = ModelStatus.query.filter(ModelStatus.name.like("ready")).first()
 
-        self.ss_test = Subset.query.filter(Subset.name.like("test")).first()
-        self.ss_train = Subset.query.filter(Subset.name.like("train")).first()
+        self.ss_test_id = ss_test_id
+        self.ss_train_id = ss_train_id
 
         # create new model
         self.db_model = Model(model_status_id=self.ms_test.id, project_id=project.id, epochs=project_settings.epochs)
-
-        # todo read settings for start model
-        # self.model_path = "project/yolo/yolov5/yolov5s.pt"
 
         total = 0
         prev_model_id = project.latest_model_id
@@ -178,8 +178,6 @@ class TrainSession:
 
     def load_data(self):
 
-        train_test_ratio = self.project_settings.train_test_ratio
-
         # get images
         # todo only select images with certain timestamp
         images = Image.query.filter(Image.project_id == self.project.id)
@@ -187,24 +185,28 @@ class TrainSession:
         # filter out "good" images
         images = [image for image in images if image.id not in self.good_images]
         print(len(images), len(self.good_images))
-        count = 0
-        threshold = train_test_ratio * len(images)
 
         for image in images:
-            count += 1
-            if count > threshold:
-                location = f"{APP_ROOT_PATH}/yolo/data/test"
-                subset_id = self.ss_test.id
-            else:
-                location = f"{APP_ROOT_PATH}/yolo/data/train"
-                subset_id = self.ss_train.id
 
-            annotations = Annotation.query.filter_by(project_id=self.project.id, image_id=image.id)
+            # skip confident images
+            if image.id in self.good_images:
+                continue
+
+            if image.subset_id == self.ss_train_id:
+                location = f"{APP_ROOT_PATH}/yolo/data/train"
+            elif image.subset_id == self.ss_test_id:
+                location = f"{APP_ROOT_PATH}/yolo/data/test"
+            else:
+                print(image.subset_id, self.ss_train_id, self.ss_test_id)
+                raise RuntimeError("subset id not found")
 
             # save image
             content = image.image
             with open(f"{location}/images/{image.id}.png", "wb") as binary_file:
                 binary_file.write(content)
+
+
+            annotations = Annotation.query.filter_by(project_id=self.project.id, image_id=image.id)
             text = ""
 
             # save label
@@ -215,7 +217,7 @@ class TrainSession:
                 text_file.write(text)
 
             # create db entry
-            mi = ModelImage(model_id=self.db_model.id, image_id=image.id, subset_id=subset_id)
+            mi = ModelImage(model_id=self.db_model.id, image_id=image.id)
             db.session.add(mi)
         db.session.commit()
 
@@ -229,7 +231,6 @@ class TrainSession:
         # set logging to warning to see much less info at console
         # logging.getLogger("utils.general").setLevel(logging.WARNING)  # yolov5 logger
         logging.getLogger("yolov5").setLevel(logging.ERROR)
-
 
         # train model with labeled images
         opt = train.parse_opt(True)
@@ -254,7 +255,7 @@ class TrainSession:
 
         # add model id to opt
         setattr(opt, "db_model_id", self.db_model.id)
-        setattr(opt, "db_train_subset_id", self.ss_train.id)
+        setattr(opt, "db_train_subset_id", self.ss_train_id)
 
         train.main(opt)  # long process
 
@@ -294,7 +295,7 @@ class TrainSession:
         # settings["compute_loss"] = True
         # print(**vars(opt))
         results, maps, t = val.run(**settings)
-        mr = add_results_to_db(results, maps, self.db_model.id, self.ss_test.id)
+        mr = add_results_to_db(results, maps, self.db_model.id, self.ss_test_id)
         # t holds speeds per image, [a, b, c]
         # a - init time
         # b - inference time
@@ -309,8 +310,15 @@ class TrainSession:
         # if os.path.exists("project/yolo/data"):
         #     shutil.rmtree("project/yolo/data")
 
+        # update model
         self.db_model.model_status_id = self.ms_ready.id
         db.session.add(self.db_model)
+        db.session.commit()
+
+        # update project
+        ps = ProjectStatus.query.filter(ProjectStatus.name.like("idle")).first()
+        self.project.project_status_id = ps.id
+        db.session.add(self.project)
         db.session.commit()
 
 def initialize_yolo_folders():
@@ -363,13 +371,31 @@ def start_training(project_id: int):
     if not os.path.isfile(f"{APP_ROOT_PATH}/yolo/yolov5/models/{name}.yaml"):
         return "yolo backbone yaml file not found"
 
+    # check if project has test and train data
+    ss_test = Subset.query.filter(Subset.name.like("test")).first()
+    ss_train = Subset.query.filter(Subset.name.like("train")).first()
+
+    test_image = Image.query.filter(and_(
+        Image.project_id == project.id,
+        Image.subset_id == ss_test.id
+    )).first()
+    train_image = Image.query.filter(and_(
+        Image.project_id == project.id,
+        Image.subset_id == ss_train.id
+    )).first()
+
+    # todo set minimum data amounts
+    if test_image is None:
+        return "test images not found"
+    if train_image is None:
+        return "train images not found"
 
     # clear dirs
     if os.path.exists(f"{APP_ROOT_PATH}/yolo/data"):
         shutil.rmtree(f"{APP_ROOT_PATH}/yolo/data")
     initialize_yolo_folders()
 
-    ts = TrainSession(project, project_settings, name)
+    ts = TrainSession(project, project_settings, name, ss_test.id, ss_train.id)
     ts.load_pretest()
     ts.pretest()
     ts.load_yaml()
@@ -377,3 +403,4 @@ def start_training(project_id: int):
     ts.train()
     ts.test()
     ts.cleanup()
+

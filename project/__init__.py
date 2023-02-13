@@ -55,6 +55,7 @@ def initialize_extensions(app):
     from project.models.annotator import Annotator
     from project.models.image_class import ImageClass
     from project.models.queue import Queue
+    from project.models.project_status import ProjectStatus
     from project.models.model_status import ModelStatus
     from project.models.model import Model
     from project.models.project import Project
@@ -65,30 +66,22 @@ def initialize_extensions(app):
     from project.models.subset import Subset
 
     # Check if the database needs to be initialized
-    recreate = False
+    recreate = True
     if recreate:
         with app.app_context():
             db.drop_all()
             db.create_all()
 
             # static data
-            s1 = ModelStatus()
-            s1.name = "training"
-            s2 = ModelStatus()
-            s2.name = "ready"
-            s3 = ModelStatus()
-            s3.name = "testing"
-            db.session.add(s1)
-            db.session.add(s2)
-            db.session.add(s3)
+            ps1 = ProjectStatus(name="busy")
+            ps2 = ProjectStatus(name="idle")
+            db.session.add_all([ps1, ps2])
             db.session.commit()
 
-            a1 = Annotator()
-            a1.name = "model"
-            a2 = Annotator()
-            a2.name = "human"
-            db.session.add(a1)
-            db.session.add(a2)
+            ms1 = ModelStatus(name="ready")
+            ms2 = ModelStatus(name="training")
+            ms3 = ModelStatus(name="testing")
+            db.session.add_all([ms1, ms2, ms3])
             db.session.commit()
 
             im1 = InitialModel(name="yolov5n")
@@ -117,6 +110,21 @@ def initialize_extensions(app):
             db.session.flush()
             pros = ProjectSettings(id=pro.id, max_class_nr=80)
             db.session.add(pros)
+            db.session.commit()
+
+            pro2 = Project(name="project2")
+            db.session.add(pro2)
+            db.session.flush()
+            pros2 = ProjectSettings(id=pro2.id, max_class_nr=80)
+            db.session.add(pros2)
+            db.session.commit()
+
+            a1 = Annotator()
+            a1.name = "model"
+            a2 = Annotator()
+            a2.name = "human"
+            db.session.add(a1)
+            db.session.add(a2)
             db.session.commit()
 
 
