@@ -69,8 +69,9 @@ def upload():
     if form.validate_on_submit():
         project_name = form.project.data
         uploader = form.uploader.data
+        split = form.split.data
         uploaded_files = request.files.getlist("files")
         uploaded_files = [f for f in _filter_files(uploaded_files)]
-        error = upload_files(uploaded_files, project_name, uploader)
+        error = upload_files(uploaded_files, project_name, uploader, split)
         return render_template("success.html", error=error)
     return render_template('upload.html', form=form)

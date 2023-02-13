@@ -8,6 +8,8 @@ import yaml
 
 from project.models.image_class import ImageClass
 from project.models.project import Project
+from project.models.project_settings import ProjectSettings
+from project.models.subset import Subset
 from project.queue_manager import add_to_queue
 
 
@@ -37,50 +39,89 @@ def upload_file(file):
     db.session.commit()
 
 
-def upload_files(files: list, project_name: str, uploader: str):
+def _upload_images(images, location, ratio, split):
+
+    count = 0
+    threshold = int(ratio * len(images))
+
+    ss_test = Subset.query.filter(Subset.name.like("test")).first()
+    ss_train = Subset.query.filter(Subset.name.like("train")).first()
+    if split == "test":
+        subset_id = ss_test.id
+    elif split == "train":
+        subset_id = ss_train.id
+
+    for image in images.values():
+        if split == "random":
+            if count > threshold:  # add to test
+                subset_id = ss_test.id
+            else:  # add to train
+                subset_id = ss_train.id
+        image.project_id = location
+        image.subset_id = subset_id
+        db.session.add(image)
+        count += 1
+
+    db.session.flush()  # generate ids
+
+def upload_files(files: list, project_name: str, uploader: str, split: str):
     """
     Upload multiple objects to database
+    :param split: test, train, random
     :param uploader:
     :param project_name:
     :param files: list of [db.model.Annotation | db.model.Image, file name]
     """
+
     annotator = Annotator.query.filter_by(name=uploader).first()
     if annotator is None:
         return "uploader not found"
+
     project = Project.query.filter_by(name=project_name).first()
     unknown_project = Project.query.filter_by(name="unknown").first()
     if project is None:
         return "project not found"
 
-    # flush all images and mark them with unknown project id
-    _dict = {}
-    for f, name in files:
-        if type(f) is Image:
-            _dict[name] = [f, False]
-            f.project_id = unknown_project.id
-            db.session.add(f)
-    db.session.flush()
+    if split not in ["test", "train", "random"]:
+        return f"unknown split {split}"
+    ps = ProjectSettings.query.get(project.id)
+    ratio = ps.train_test_ratio
 
-    # iterate over annotations and check if image exists with same name
-    # if does make connection, also add mark to later change project id
-    # else drop annotation
-    for f, name in files:
-        if type(f) is Annotation:
-            if name in _dict:
-                i, _ = _dict[name]
-                _dict[name] = [i, True]
-                f.image_id = i.id
-                f.project_id = project.id
-                f.annotator_id = annotator.id
-                db.session.add(f)
 
-    # if image has mark then change project id
-    for f, name in files:
-        if type(f) is Image:
-            if _dict[name][1]:
-                f.project_id = project.id
-                db.session.add(f)
+    # find all annotations
+    annotations = {x[1] for x in files if type(x[0]) is Annotation}
 
+    # find images
+    failed_images = {}
+    passed_images = {}
+    for f in files:
+        image, name = f
+        if type(image) is not Image:
+            continue
+
+        if name in annotations:
+            passed_images[name] = image
+        else:
+            failed_images[name] = image
+
+    # upload images
+    _upload_images(passed_images, project.id, ratio, split)
+    _upload_images(failed_images, unknown_project.id, ratio, split)
+
+    # upload only passed image's annotations
+    for f in files:
+        ano, name = f
+        if type(ano) is not Annotation:
+            continue
+
+        if name in passed_images:
+            i = passed_images[name]
+            ano.project_id = project.id
+            ano.annotator_id = annotator.id
+            ano.image_id = i.id
+            db.session.add(ano)
+
+    db.session.commit()
     add_to_queue(project.id)
     return "done"
 

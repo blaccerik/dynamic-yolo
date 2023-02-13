@@ -21,7 +21,7 @@ class ProjectSettings(db.Model):
     initial_model_id = Column(Integer, ForeignKey("initial_model.id"), nullable=False, default=get_default_name_id)
     confidence_threshold = Column(Float, nullable=False, default=0.95) # how confident model needs to be to skip image
     train_test_ratio = Column(Float, nullable=False, default=0.75)
-    minimal_map_50_threshold = Column(Float, nullable=False, default=0.05)
+    minimal_map_50_threshold = Column(Float, nullable=False, default=0)
 
     # min confidence for model to read image section as detection
     min_confidence_threshold = Column(Float, nullable=False, default=0.25)
