@@ -6,8 +6,6 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 
-
-
 db = SQLAlchemy()
 
 # /home/...../dynamic-yolo/project
@@ -24,7 +22,7 @@ def create_app(config_filename=None):
     app = Flask(__name__)
 
     # Configure the Flask application
-    #config_type = os.getenv('CONFIG_TYPE', default='config.DevelopmentConfig')
+    # config_type = os.getenv('CONFIG_TYPE', default='config.DevelopmentConfig')
     app.config.from_object(config_filename)
     # project.debug = True
     # print(project.config)
@@ -43,9 +41,8 @@ def create_app(config_filename=None):
         scheduler.start()
         atexit.register(lambda: scheduler.shutdown())
 
-
-
     return app
+
 
 # ----------------
 # Helper Functions
