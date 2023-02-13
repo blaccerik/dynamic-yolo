@@ -8,5 +8,5 @@ class Subset(db.Model):
     id = Column(Integer, primary_key=True)
     name = Column(VARCHAR(128), nullable=False, unique=False)
 
-    model_images = relationship("ModelImage", backref="subset")
+    model_images = relationship("Image", backref="subset")
     model_results = relationship("ModelResults", backref="subset")

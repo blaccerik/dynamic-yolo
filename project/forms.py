@@ -7,6 +7,7 @@ class UploadFileForm(FlaskForm):
     files = MultipleFileField("Files", validators=[InputRequired()])
     project = StringField("Project id", validators=[InputRequired()])
     uploader = StringField("Uploader", validators=[InputRequired()])
+    split = StringField("Split", validators=[InputRequired()])
     submit = SubmitField("Upload File")
 
 

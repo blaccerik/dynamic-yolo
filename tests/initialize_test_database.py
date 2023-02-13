@@ -6,7 +6,7 @@ from project.models.image_subset import ImageSubset
 from project.models.model import Model
 from project.models.model_image import ModelImage
 from project.models.model_results import ModelResults
-from project.models.model_status import ModelStatus
+from project.models.model_status import ProjectStatus
 from project.models.project import Project
 from project.models.project_settings import ProjectSettings
 
@@ -14,11 +14,11 @@ import os
 
 def create_database_for_testing(db):
     # static data
-    s1 = ModelStatus()
+    s1 = ProjectStatus()
     s1.name = "training"
-    s2 = ModelStatus()
+    s2 = ProjectStatus()
     s2.name = "ready"
-    s3 = ModelStatus()
+    s3 = ProjectStatus()
     s3.name = "testing"
     db.session.add(s1)
     db.session.add(s2)
@@ -87,7 +87,7 @@ def create_database_for_testing(db):
     db.session.add_all([a1, a2, a3])
     db.session.flush()
 
-    ms = ModelStatus.query.filter_by(name="ready").first()
+    ms = ProjectStatus.query.filter_by(name="ready").first()
     m1 = Model(model_status_id=ms.id, project_id=p1.id,total_epochs=3,epochs=3)
     m2 = Model(model_status_id=ms.id, project_id=p1.id,total_epochs=100,epochs=100)
     db.session.add_all([m1, m2])

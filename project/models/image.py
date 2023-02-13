@@ -13,3 +13,4 @@ class Image(db.Model):
     project_id = Column(BigInteger, ForeignKey("project.id"), nullable=False)
     annotations = relationship("Annotation", backref="image")
     models = relationship("Model", secondary="model_image", back_populates="images")
+    subset_id = Column(Integer, ForeignKey("subset.id"), nullable=False)

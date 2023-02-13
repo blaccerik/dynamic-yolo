@@ -7,7 +7,7 @@ from project.models.image_class import ImageClass
 from project.models.model import Model
 from project.models.model_image import ModelImage
 from project.models.model_results import ModelResults
-from project.models.model_status import ModelStatus
+from project.models.model_status import ProjectStatus
 from project.models.project import Project
 from project.models.project_settings import ProjectSettings
 from project.models.queue import Queue
@@ -24,11 +24,11 @@ class ModelTest(TestCase):
     def setUp(self):
         db.drop_all()
         db.create_all()
-        s1 = ModelStatus()
+        s1 = ProjectStatus()
         s1.name = "training"
-        s2 = ModelStatus()
+        s2 = ProjectStatus()
         s2.name = "ready"
-        s3 = ModelStatus()
+        s3 = ProjectStatus()
         s3.name = "idle"
         db.session.add(s1)
         db.session.add(s2)
@@ -91,7 +91,7 @@ class ModelTest(TestCase):
         db.session.add_all([a1, a2, a3])
         db.session.flush()
 
-        ms = ModelStatus.query.filter_by(name="idle").first()
+        ms = ProjectStatus.query.filter_by(name="idle").first()
         m1 = Model(model_status_id=ms.id, project_id=p1.id)
         m2 = Model(model_status_id=ms.id, project_id=p1.id)
         db.session.add_all([m1, m2])
