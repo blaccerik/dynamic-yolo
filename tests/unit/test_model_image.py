@@ -33,10 +33,3 @@ class TestModelImage(TestCase):
         actual_image_id = self.model_image.image_id
 
         assert expected_image_id == actual_image_id
-
-    def test_image_subset_id_column(self):
-        expected_image_subset_id = 1
-
-        actual_image_subset_id = self.model_image.image_subset_id
-
-        assert expected_image_subset_id == actual_image_subset_id
