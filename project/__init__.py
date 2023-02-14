@@ -66,7 +66,7 @@ def initialize_extensions(app):
     from project.models.subset import Subset
 
     # Check if the database needs to be initialized
-    recreate = True
+    recreate = False
     if recreate:
         with app.app_context():
             db.drop_all()
@@ -132,9 +132,13 @@ def register_blueprints(app):
     from project.views import home
     from project.views import upload
     from project.views import upload_classes
+    from project.views import users
+    from project.views import project
 
     app.register_blueprint(upload_classes.mod)
     app.register_blueprint(home.mod)
     app.register_blueprint(upload.mod)
+    app.register_blueprint(users.REQUEST_API)
+    app.register_blueprint(project.REQUEST_API)
 
 # TODO Fix observer functionality

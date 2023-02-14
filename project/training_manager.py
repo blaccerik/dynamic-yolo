@@ -48,13 +48,19 @@ def add_results_to_db(results, maps, model_id, subset_id, epoch=None) -> ModelRe
 from project.yolo.yolov5 import val, train, detect
 
 class TrainSession:
-    def __init__(self, project: Project, project_settings: ProjectSettings, name: str, ss_test_id: int, ss_train_id: int):
+    def __init__(self, project: Project,
+                 project_settings: ProjectSettings,
+                 name: str,
+                 ss_test_id: int,
+                 ss_train_id: int,
+                 ps_idle_id: int):
         self.ms_train = ModelStatus.query.filter(ModelStatus.name.like("training")).first()
         self.ms_test = ModelStatus.query.filter(ModelStatus.name.like("testing")).first()
         self.ms_ready = ModelStatus.query.filter(ModelStatus.name.like("ready")).first()
 
         self.ss_test_id = ss_test_id
         self.ss_train_id = ss_train_id
+        self.ps_idle_id = ps_idle_id
 
         # create new model
         self.db_model = Model(model_status_id=self.ms_test.id, project_id=project.id, epochs=project_settings.epochs)
@@ -316,8 +322,7 @@ class TrainSession:
         db.session.commit()
 
         # update project
-        ps = ProjectStatus.query.filter(ProjectStatus.name.like("idle")).first()
-        self.project.project_status_id = ps.id
+        self.project.project_status_id = self.ps_idle_id
         db.session.add(self.project)
         db.session.commit()
 
@@ -374,6 +379,7 @@ def start_training(project_id: int):
     # check if project has test and train data
     ss_test = Subset.query.filter(Subset.name.like("test")).first()
     ss_train = Subset.query.filter(Subset.name.like("train")).first()
+    ps_idle = ProjectStatus.query.filter(ProjectStatus.name.like("idle")).first()
 
     test_image = Image.query.filter(and_(
         Image.project_id == project.id,
@@ -386,8 +392,14 @@ def start_training(project_id: int):
 
     # todo set minimum data amounts
     if test_image is None:
+        project.project_status_id = ps_idle.id
+        db.session.add(project)
+        db.session.commit()
         return "test images not found"
     if train_image is None:
+        project.project_status_id = ps_idle.id
+        db.session.add(project)
+        db.session.commit()
         return "train images not found"
 
     # clear dirs
@@ -395,7 +407,7 @@ def start_training(project_id: int):
         shutil.rmtree(f"{APP_ROOT_PATH}/yolo/data")
     initialize_yolo_folders()
 
-    ts = TrainSession(project, project_settings, name, ss_test.id, ss_train.id)
+    ts = TrainSession(project, project_settings, name, ss_test.id, ss_train.id, ps_idle.id)
     ts.load_pretest()
     ts.pretest()
     ts.load_yaml()

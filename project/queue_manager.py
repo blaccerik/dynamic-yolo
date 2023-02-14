@@ -24,7 +24,6 @@ def update_queue(app):
         # check if anything is training
         ps = ProjectStatus.query.filter(ProjectStatus.name.like("busy")).first()
         entry = Project.query.filter(Project.project_status_id == ps.id).first()
-        print(entry)
         if entry is not None:
             return
 
