@@ -309,7 +309,7 @@ class TrainSession:
 
         # see if model needs to be retrained
         if mr.metric_map_50 < self.project_settings.minimal_map_50_threshold:
-            from project.queue_manager import add_to_queue  # avoid circular import
+            from project.services.queue_service import add_to_queue  # avoid circular import
             add_to_queue(self.project.id)
 
     def cleanup(self):

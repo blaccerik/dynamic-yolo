@@ -1,19 +1,18 @@
 from io import BytesIO
 
 import PIL
-from flask import Blueprint, render_template, request, jsonify
+from flask import Blueprint, request, jsonify
 from marshmallow import ValidationError
 from werkzeug.utils import secure_filename
 
-from project.api import upload_files
-from project.forms import CreateProjectForm
+from project.services.file_upload_service import upload_files
 from project.models.annotation import Annotation
 from project.models.image import Image
-from project.project_manager import create_project
+from project.services.project_service import create_project
 from project.schemas.project import Project
 from project.schemas.upload import Upload
 
-REQUEST_API= Blueprint('project',__name__, url_prefix="/projects")
+REQUEST_API = Blueprint('project', __name__, url_prefix="/projects")
 
 image_types = [
     "image/jpeg",
@@ -84,6 +83,7 @@ def _filestorage_to_db_item(f):
 /api/queue -> post add project ##
 """
 
+
 @REQUEST_API.route('/<int:project_id>/upload', methods=["POST"])
 def upload(project_id: int):
     data = Upload().load(request.form)
@@ -93,7 +93,8 @@ def upload(project_id: int):
     uploaded_files = [f for f in _filter_files(uploaded_files)]
     passed, failed, annotations = upload_files(uploaded_files, project_id, uploader, split)
 
-    return jsonify({'message': f'Uploaded {passed} images and {annotations} annotations. There were {failed} failed images'}), 201
+    return jsonify(
+        {'message': f'Uploaded {passed} images and {annotations} annotations. There were {failed} failed images'}), 201
 
 
 @REQUEST_API.route('/', methods=['POST'])

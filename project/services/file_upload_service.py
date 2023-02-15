@@ -3,14 +3,11 @@ from project.models.annotation import Annotation
 from project.models.annotator import Annotator
 from project.models.image import Image
 
-import project.yolo.yolov5.train as train
-import yaml
-
 from project.models.image_class import ImageClass
 from project.models.project import Project
 from project.models.project_settings import ProjectSettings
 from project.models.subset import Subset
-from project.queue_manager import add_to_queue
+from project.services.queue_service import add_to_queue
 
 
 def upload_classes_to_db(project_name: str, classes: dict):
@@ -40,7 +37,6 @@ def upload_file(file):
 
 
 def _upload_images(images, location, ratio, split):
-
     count = 0
     threshold = int(ratio * len(images))
 
@@ -64,6 +60,7 @@ def _upload_images(images, location, ratio, split):
 
     db.session.flush()  # generate ids
     return count
+
 
 def upload_files(files: list, project_code: int, uploader: str, split: str) -> (int, int, int):
     """

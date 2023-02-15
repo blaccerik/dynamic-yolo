@@ -16,9 +16,11 @@ class UploadClassFileForm(FlaskForm):
     project_name = StringField("Project name", validators=[InputRequired()])
     submit = SubmitField("Upload File")
 
+
 class CreateUserForm(FlaskForm):
     name = StringField("Name", validators=[InputRequired()])
     submit = SubmitField("Create")
+
 
 class CreateProjectForm(FlaskForm):
     name = StringField("Name", validators=[InputRequired()])

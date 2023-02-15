@@ -12,7 +12,6 @@ db = SQLAlchemy()
 APP_ROOT_PATH = pathlib.Path(__file__).parent.resolve()
 
 
-
 # ----------------------------
 # Application Factory Function
 # ----------------------------
@@ -34,7 +33,7 @@ def create_app(config_filename=None):
     # Check if the database needs to be initialized
 
     if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
-        from project.queue_manager import update_queue
+        from project.services.queue_service import update_queue
 
         scheduler = BackgroundScheduler(job_defaults={'max_instances': 2})
         scheduler.add_job(func=update_queue, args=[app], trigger="interval", seconds=5)

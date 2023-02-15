@@ -1,8 +1,8 @@
-from flask import render_template, Blueprint
+from flask import Blueprint
 
 from project.models.project import Project
-from project.queue_manager import add_to_queue, start_training
-from project.training_manager import TrainSession
+from project.services.queue_service import add_to_queue, start_training
+from project.services.training_service import TrainSession
 
 mod = Blueprint('home', __name__)
 
