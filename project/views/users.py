@@ -1,11 +1,10 @@
-import uuid
-
 from flask import Blueprint, request, jsonify
 
 from project.schemas.user import User
-from project.user_manager import create_user
+from project.services.user_service import create_user
 
-REQUEST_API = Blueprint('users',__name__, url_prefix="/users")
+REQUEST_API = Blueprint('users', __name__, url_prefix="/users")
+
 
 @REQUEST_API.route('/', methods=['POST'])
 def create_record():
