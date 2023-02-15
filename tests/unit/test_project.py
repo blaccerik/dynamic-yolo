@@ -89,3 +89,10 @@ class TestProject(TestCase):
         actual_latest_model_id = self.project.latest_model.id
 
         assert expected_latest_model_id == actual_latest_model_id
+
+    def test_default_project_status_id(self):
+        expected_project_status_id = 2
+
+        actual_project_status_id = self.project.project_status_id
+
+        assert expected_project_status_id == actual_project_status_id

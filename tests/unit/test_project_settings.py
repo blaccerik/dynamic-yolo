@@ -76,6 +76,13 @@ class TestProjectSettings(TestCase):
 
         assert expected_train_test_ratio == actual_train_test_ratio
 
+    def test_minimal_map_50_threshold_column(self):
+        expected_minimal_map_50_threshold = 0
+
+        actual_minimal_map_50_threshold = self.project_settings.minimal_map_50_threshold
+
+        assert expected_minimal_map_50_threshold == actual_minimal_map_50_threshold
+        
     def test_min_confidence_threshold_column(self):
         expected_min_confidence_threshold = 0.25
 

@@ -54,3 +54,10 @@ class ImageTest(TestCase):
         actual_width_data = self.image.width
 
         assert expected_width_data == actual_width_data
+
+    def test_subset_id(self):
+        expected_subset_id = 1
+
+        actual_subset_id = self.image.subset_id
+
+        assert expected_subset_id == actual_subset_id
