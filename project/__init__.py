@@ -137,7 +137,7 @@ def register_blueprints(app):
 
     app.register_blueprint(upload_classes.mod)
     app.register_blueprint(home.mod)
-    app.register_blueprint(upload.mod)
+    app.register_blueprint(upload.REQUEST_API)
     app.register_blueprint(users.REQUEST_API)
     app.register_blueprint(project.REQUEST_API)
 

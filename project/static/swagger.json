@@ -21,7 +21,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/User"
+                "$ref": "#/components/schemas/user"
               }
             }
           }
@@ -36,7 +36,7 @@
         }
       }
     },
-    "/project": {
+    "/projects": {
       "post": {
         "tags": [
           "Project Requests"
@@ -47,7 +47,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Project"
+                "$ref": "#/components/schemas/project"
               }
             }
           }
@@ -60,12 +60,60 @@
             "description": "User has been created"
           }
         }
+      },
+      "get": {
+        "tags": [
+          "Project Requests"
+        ],
+        "summary": "Get all projects",
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/projects/{project_id}/upload": {
+      "post": {
+        "tags": [
+          "Project Requests"
+        ], 
+        "summary": "Upload images to project",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "description": "Project id",
+            "schema": {
+              "$ref": "#/components/schemas/project_id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/upload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        }
       }
     }
   },
   "components": {
     "schemas": {
-      "User": {
+      "project_id": {
+        "type": "integer"
+      },
+      "user": {
         "type": "object",
         "properties": {
           "name": {
@@ -74,7 +122,7 @@
           }
         }
       },
-      "Project": {
+      "project": {
         "type": "object",
         "properties": {
           "name": {
@@ -83,6 +131,26 @@
           },
           "max_class_nr": {
             "type": "integer"
+          }
+        }
+      },
+      "upload": {
+        "type": "object",
+        "properties": {
+          "uploader_name": {
+            "type": "string",
+            "format": "string"
+          },
+          "split": {
+            "type": "string",
+            "format": "string"
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "binary"
+            }
           }
         }
       }

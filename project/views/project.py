@@ -1,35 +1,108 @@
-from flask import Blueprint, render_template, request, jsonify
+from io import BytesIO
 
+import PIL
+from flask import Blueprint, render_template, request, jsonify
+from marshmallow import ValidationError
+from werkzeug.utils import secure_filename
+
+from project.api import upload_files
 from project.forms import CreateProjectForm
+from project.models.annotation import Annotation
+from project.models.image import Image
 from project.project_manager import create_project
 from project.schemas.project import Project
+from project.schemas.upload import Upload
 
-REQUEST_API= Blueprint('project',__name__, url_prefix="/project")
+REQUEST_API= Blueprint('project',__name__, url_prefix="/projects")
+
+image_types = [
+    "image/jpeg",
+    "image/png"
+]
+
+text_types = [
+    "text/plain"
+]
+
+
+def _filter_files(files):
+    for f in files:
+        print(f)
+        print(f.content_type)
+        if f.content_type in image_types or f.content_type in text_types:
+            for item in _filestorage_to_db_item(f):
+                yield item
+        else:
+            raise ValidationError("only images and txt files can be uploaded")
+
+
+def _text_to_annotations(text, name):
+    _list = []
+    for line in text.splitlines():
+        try:
+            nr, x, y, w, h = line.strip().split(" ")
+            nr = int(nr)
+            x = float(x)
+            y = float(y)
+            w = float(w)
+            h = float(h)
+            _list.append((Annotation(x_center=x, y_center=y, width=w, height=h, class_id=nr), name))
+        except Exception as e:
+            raise ValidationError(f"txt file named: {name} did not follow yolo format.")
+    return _list
+
+
+def _filestorage_to_db_item(f):
+    content = f.stream.read()
+    if f.content_type in text_types:  # text file
+        text = str(content, "utf-8")
+        name = secure_filename(f.filename).split(".")[0]
+        _list = _text_to_annotations(text, name)
+        f.stream.close()
+        return _list
+    else:  # image file
+        io_bytes = BytesIO(content)
+        img = PIL.Image.open(io_bytes)
+        f.stream.close()
+        name = secure_filename(f.filename).split(".")[0]
+        return (Image(image=content, width=img.size[0], height=img.size[1]), name),
+
+
+"""
+/api/projects/ -> get projects +e
+/api/projects/ -> post create + 
+/api/projects/43 -> get info +
+/api/projects/43/images -> ?page=1&number=20 ##
+/api/projects/43/settings -> put change settings 
+/api/projects/43/upload -> post upload images +e
+/api/projects/43/models get models +
+/api/projects/43/models/3 get 1 model info +
+/api/projects/43/models/3/download get download model +
+
+/api/users/ -> post create +e
+/api/queue -> get +
+/api/queue -> post add project ##
+"""
+
+@REQUEST_API.route('/<int:project_id>/upload', methods=["POST"])
+def upload(project_id: int):
+    data = Upload().load(request.form)
+    uploader = data["uploader_name"]
+    split = data["split"]
+    uploaded_files = request.files.getlist("files")
+    uploaded_files = [f for f in _filter_files(uploaded_files)]
+    passed, failed, annotations = upload_files(uploaded_files, project_id, uploader, split)
+
+    return jsonify({'message': f'Uploaded {passed} images and {annotations} annotations. There were {failed} failed images'}), 201
 
 
 @REQUEST_API.route('/', methods=['POST'])
 def create_record():
-    """
-
-    """
     data = Project().load(request.json)
     name = data["name"]
     max_class_nr = data["max_class_nr"]
-    msg = create_project(name, max_class_nr)
-    if msg == "error":
+    code = create_project(name, max_class_nr)
+    if code == -1:
         return jsonify({'error': 'Project with that name already exists'}), 409
 
-    return jsonify({'message': 'Project created successfully'}), 201
-
-# @mod.route('/create', methods=["GET", "POST"])
-# def upload():
-#     form = CreateProjectForm()
-#     error = None
-#     if form.validate_on_submit():
-#         name = form.name.data
-#         max_class_nr = form.max_class_nr.data
-#         completed = create_project(name, max_class_nr)
-#         if completed:
-#             return render_template("success.html", error="done")
-#         error = f"Project {name} exists"
-#     return render_template('create_project.html', form=form, error=error)
+    return jsonify({'message': f'Project {code} created successfully'}), 201
