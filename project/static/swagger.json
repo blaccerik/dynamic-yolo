@@ -121,12 +121,11 @@
             "required": true,
             "schema": {
               "$ref": "#/components/schemas/project_id"
-
             }
           }
         ],
         "responses": {
-          "200":{
+          "200": {
             "description": "Project details",
             "content": {
               "application/json": {
@@ -138,11 +137,46 @@
           }
         }
       }
+    },
+    "/projects/{project_id}/settings": {
+      "put": {
+        "tags": [
+          "Project Requests"
+        ],
+        "summary": "Change project settings",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "description": "ID of the project",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/project_id"
+            }
+          },
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                 "$ref": "#/components/schemas/project_settings"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Project settings updated"
+          },
+          "400": {
+            "description": "Invalid project ID or settings"
+          },
+          "404": {
+            "description": "Project not found"
+          }
+        }
+      }
     }
-
-
-
-
   },
   "components": {
     "schemas": {
@@ -189,7 +223,52 @@
             }
           }
         }
-      }
+      },
+      "project_settings": {
+        "type": "object",
+        "properties": {
+          "max_class_nr": {
+            "type": "integer",
+            "description": "Maximum number of classes"
+          },
+          "epochs": {
+            "type": "integer",
+            "description": "Number of training epochs"
+          },
+          "batch_size": {
+            "type": "integer",
+            "description": "Batch size for training"
+          },
+          "img_size": {
+            "type": "integer",
+            "description": "Image size for training"
+          },
+          "initial_model_id": {
+            "type": "integer",
+            "description": "ID of the initial model"
+          },
+          "confidence_threshold": {
+            "type": "number",
+            "description": "Confidence threshold for skipping images"
+          },
+          "train_test_ratio": {
+            "type": "number",
+            "description": "Training and testing data split ratio"
+          },
+          "minimal_map_50_threshold": {
+            "type": "number",
+            "description": "Minimal map threshold"
+          },
+          "min_confidence_threshold": {
+            "type": "number",
+            "description": "Minimum confidence threshold for detection"
+          },
+          "min_iou_threshold": {
+            "type": "number",
+            "description": "Minimum intersection over union threshold for detection"
+          }
+        }
+      },
     }
   }
 }
