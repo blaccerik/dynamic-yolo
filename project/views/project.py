@@ -8,7 +8,7 @@ from werkzeug.utils import secure_filename
 from project.services.file_upload_service import upload_files
 from project.models.annotation import Annotation
 from project.models.image import Image
-from project.services.project_service import create_project, get_models, get_all_projects
+from project.services.project_service import create_project, get_models, get_all_projects, get_project_info
 from project.schemas.project import Project
 from project.schemas.upload import Upload
 from project.schemas.model import Model
@@ -118,6 +118,16 @@ def upload(project_id: int):
 
     return jsonify(
         {'message': f'Uploaded {passed} images and {annotations} annotations. There were {failed} failed images'}), 201
+
+
+@REQUEST_API.route('/<int:project_id>', methods=['GET'])
+def get_info(project_id):
+    project_info = get_project_info(project_id)
+
+    if project_info is None:
+        return jsonify({'error': 'Project with that id does not exist'}), 404
+
+    return jsonify(project_info)
 
 
 @REQUEST_API.route('/<int:project_id>/models', methods=['GET'])
