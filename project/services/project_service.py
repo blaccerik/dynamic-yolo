@@ -34,8 +34,9 @@ def get_models(project_code: int):
 
     return models
 
-# def get_all():
-#     """
-#     Get all projects
-#     """
-#     return Project.query.all()
+
+def get_all_projects():
+    """
+    Get all projects
+    """
+    return Project.query.all()

@@ -8,8 +8,7 @@ from werkzeug.utils import secure_filename
 from project.services.file_upload_service import upload_files
 from project.models.annotation import Annotation
 from project.models.image import Image
-from project.services.project_service import create_project
-from project.services.project_service import get_models
+from project.services.project_service import create_project, get_models, get_all_projects
 from project.schemas.project import Project
 from project.schemas.upload import Upload
 from project.schemas.model import Model
@@ -86,6 +85,28 @@ def _filestorage_to_db_item(f):
 """
 
 
+@REQUEST_API.route('/', methods=['POST'])
+def create_record():
+    data = Project().load(request.json)
+    name = data["name"]
+    max_class_nr = data["max_class_nr"]
+    code = create_project(name, max_class_nr)
+    if code == -1:
+        return jsonify({'error': 'Project with that name already exists'}), 409
+
+    return jsonify({'message': f'Project {code} created successfully'}), 201
+
+
+@REQUEST_API.route('/', methods=['GET'])
+def get_projects():
+    all_projects = get_all_projects()
+
+    project_schema = Project(many=True)
+    serialized_projects = project_schema.dump(all_projects)
+
+    return serialized_projects
+
+
 @REQUEST_API.route('/<int:project_id>/upload', methods=["POST"])
 def upload(project_id: int):
     data = Upload().load(request.form)
@@ -97,18 +118,6 @@ def upload(project_id: int):
 
     return jsonify(
         {'message': f'Uploaded {passed} images and {annotations} annotations. There were {failed} failed images'}), 201
-
-
-@REQUEST_API.route('/', methods=['POST'])
-def create_record():
-    data = Project().load(request.json)
-    name = data["name"]
-    max_class_nr = data["max_class_nr"]
-    code = create_project(name, max_class_nr)
-    if code == -1:
-        return jsonify({'error': 'Project with that name already exists'}), 409
-
-    return jsonify({'message': f'Project {code} created successfully'}), 201
 
 
 @REQUEST_API.route('/<int:project_id>/models', methods=['GET'])
