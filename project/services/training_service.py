@@ -4,6 +4,7 @@ import shutil
 
 import yaml
 from sqlalchemy import and_
+from torch.cuda import OutOfMemoryError
 
 from project import db, APP_ROOT_PATH
 from project.models.annotation import Annotation
@@ -52,15 +53,13 @@ class TrainSession:
                  project_settings: ProjectSettings,
                  name: str,
                  ss_test_id: int,
-                 ss_train_id: int,
-                 ps_idle_id: int):
+                 ss_train_id: int):
         self.ms_train = ModelStatus.query.filter(ModelStatus.name.like("training")).first()
         self.ms_test = ModelStatus.query.filter(ModelStatus.name.like("testing")).first()
         self.ms_ready = ModelStatus.query.filter(ModelStatus.name.like("ready")).first()
 
         self.ss_test_id = ss_test_id
         self.ss_train_id = ss_train_id
-        self.ps_idle_id = ps_idle_id
 
         # create new model
         self.db_model = Model(model_status_id=self.ms_test.id, project_id=project.id, epochs=project_settings.epochs)
@@ -245,6 +244,8 @@ class TrainSession:
         setattr(opt, "data", f"{APP_ROOT_PATH}/yolo/data/data.yaml")
         setattr(opt, "batch_size", self.project_settings.batch_size)
         setattr(opt, "img", self.project_settings.img_size)
+        setattr(opt, "imgsz", self.project_settings.img_size)
+        setattr(opt, "img_size", self.project_settings.img_size)
         setattr(opt, "epochs", self.project_settings.epochs)
 
         # setattr(opt, "noval", True)  # validate only last epoch
@@ -262,13 +263,19 @@ class TrainSession:
         # add model id to opt
         setattr(opt, "db_model_id", self.db_model.id)
         setattr(opt, "db_train_subset_id", self.ss_train_id)
-
-        train.main(opt)  # long process
+        try:
+            train.main(opt)  # long process
+        except OutOfMemoryError:
+            return True
+        except RuntimeError: # RuntimeError: Unable to find a valid cuDNN algorithm to run convolution
+            # should be the same as out of memory
+            return True
 
         # read model weights
         with open(f"{APP_ROOT_PATH}/yolo/data/model/yolo_train/weights/best.pt", "rb") as f:
             content = f.read()
             self.db_model.model = content
+        return False
 
     def test(self):
 
@@ -321,11 +328,6 @@ class TrainSession:
         db.session.add(self.db_model)
         db.session.commit()
 
-        # update project
-        self.project.project_status_id = self.ps_idle_id
-        db.session.add(self.project)
-        db.session.commit()
-
 def initialize_yolo_folders():
     """
     yolo:
@@ -359,27 +361,26 @@ def create_path(path):
         os.mkdir(path)
 
 
-def start_training(project_id: int):
-    print({APP_ROOT_PATH})
+def start_training(project: Project) -> bool:
     """
     Start yolo training session with the latest data
+    :returns
+    True - error
+    False - no error
     """
-    project = Project.query.get(project_id)
-    if project is None:
-        return "project not found"
-    project_settings = ProjectSettings.query.get(project_id)
+    # check settings entry
+    project_settings = ProjectSettings.query.get(project.id)
     if project_settings is None:
-        return "project settings not found"
+        return True
 
     # check if backbone file is present
     name = InitialModel.query.get(project_settings.initial_model_id).name
     if not os.path.isfile(f"{APP_ROOT_PATH}/yolo/yolov5/models/{name}.yaml"):
-        return "yolo backbone yaml file not found"
+        return True
 
     # check if project has test and train data
     ss_test = Subset.query.filter(Subset.name.like("test")).first()
     ss_train = Subset.query.filter(Subset.name.like("train")).first()
-    ps_idle = ProjectStatus.query.filter(ProjectStatus.name.like("idle")).first()
 
     test_image = Image.query.filter(and_(
         Image.project_id == project.id,
@@ -392,27 +393,24 @@ def start_training(project_id: int):
 
     # todo set minimum data amounts
     if test_image is None:
-        project.project_status_id = ps_idle.id
-        db.session.add(project)
-        db.session.commit()
-        return "test images not found"
+        return False
     if train_image is None:
-        project.project_status_id = ps_idle.id
-        db.session.add(project)
-        db.session.commit()
-        return "train images not found"
+        return False
 
     # clear dirs
     if os.path.exists(f"{APP_ROOT_PATH}/yolo/data"):
         shutil.rmtree(f"{APP_ROOT_PATH}/yolo/data")
     initialize_yolo_folders()
 
-    ts = TrainSession(project, project_settings, name, ss_test.id, ss_train.id, ps_idle.id)
+    ts = TrainSession(project, project_settings, name, ss_test.id, ss_train.id)
     ts.load_pretest()
     ts.pretest()
     ts.load_yaml()
     ts.load_data()
-    ts.train()
+    error = ts.train()
+    if error:
+        return True
     ts.test()
     ts.cleanup()
+    return False
 
