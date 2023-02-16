@@ -1,13 +1,10 @@
-import time
-
-from sqlalchemy import func, asc, or_
+from sqlalchemy import func, asc
 
 from project import db
-from project.models.model import Model
 from project.models.project_status import ProjectStatus
 from project.models.project import Project
 from project.models.queue import Queue
-from project.training_manager import start_training
+from project.services.training_service import start_training
 
 
 def update_queue(app):
@@ -24,7 +21,6 @@ def update_queue(app):
         # check if anything is training
         ps = ProjectStatus.query.filter(ProjectStatus.name.like("busy")).first()
         entry = Project.query.filter(Project.project_status_id == ps.id).first()
-        print(entry)
         if entry is not None:
             return
 

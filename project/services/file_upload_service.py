@@ -3,14 +3,11 @@ from project.models.annotation import Annotation
 from project.models.annotator import Annotator
 from project.models.image import Image
 
-import project.yolo.yolov5.train as train
-import yaml
-
 from project.models.image_class import ImageClass
 from project.models.project import Project
 from project.models.project_settings import ProjectSettings
 from project.models.subset import Subset
-from project.queue_manager import add_to_queue
+from project.services.queue_service import add_to_queue
 
 
 def upload_classes_to_db(project_name: str, classes: dict):
@@ -40,7 +37,6 @@ def upload_file(file):
 
 
 def _upload_images(images, location, ratio, split):
-
     count = 0
     threshold = int(ratio * len(images))
 
@@ -63,30 +59,31 @@ def _upload_images(images, location, ratio, split):
         count += 1
 
     db.session.flush()  # generate ids
+    return count
 
-def upload_files(files: list, project_name: str, uploader: str, split: str):
+
+def upload_files(files: list, project_code: int, uploader: str, split: str) -> (int, int, int):
     """
     Upload multiple objects to database
+    :param project_code:
     :param split: test, train, random
     :param uploader:
-    :param project_name:
     :param files: list of [db.model.Annotation | db.model.Image, file name]
     """
 
     annotator = Annotator.query.filter_by(name=uploader).first()
     if annotator is None:
-        return "uploader not found"
+        raise Exception("ano")
 
-    project = Project.query.filter_by(name=project_name).first()
+    project = Project.query.get(project_code)
     unknown_project = Project.query.filter_by(name="unknown").first()
     if project is None:
-        return "project not found"
+        raise Exception("project")
 
     if split not in ["test", "train", "random"]:
-        return f"unknown split {split}"
+        raise Exception(f"unknown split {split}")
     ps = ProjectSettings.query.get(project.id)
     ratio = ps.train_test_ratio
-
 
     # find all annotations
     annotations = {x[1] for x in files if type(x[0]) is Annotation}
@@ -105,8 +102,9 @@ def upload_files(files: list, project_name: str, uploader: str, split: str):
             failed_images[name] = image
 
     # upload images
-    _upload_images(passed_images, project.id, ratio, split)
-    _upload_images(failed_images, unknown_project.id, ratio, split)
+    passed_images_number = _upload_images(passed_images, project.id, ratio, split)
+    failed_images_number = _upload_images(failed_images, unknown_project.id, ratio, split)
+    annotations_number = 0
 
     # upload only passed image's annotations
     for f in files:
@@ -120,10 +118,11 @@ def upload_files(files: list, project_name: str, uploader: str, split: str):
             ano.annotator_id = annotator.id
             ano.image_id = i.id
             db.session.add(ano)
+            annotations_number += 1
 
     db.session.commit()
     add_to_queue(project.id)
-    return "done"
+    return passed_images_number, failed_images_number, annotations_number
 
 
 def check_existing_annotations(project_name: str):

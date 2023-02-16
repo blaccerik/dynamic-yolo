@@ -1,6 +1,6 @@
 from flask import render_template, request, Blueprint
 from project.forms import UploadClassFileForm
-from project.api import upload_classes_to_db
+from project.services.file_upload_service import upload_classes_to_db
 
 mod = Blueprint('upload_classes', __name__)
 

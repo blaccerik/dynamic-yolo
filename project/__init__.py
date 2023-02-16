@@ -12,7 +12,6 @@ db = SQLAlchemy()
 APP_ROOT_PATH = pathlib.Path(__file__).parent.resolve()
 
 
-
 # ----------------------------
 # Application Factory Function
 # ----------------------------
@@ -34,7 +33,7 @@ def create_app(config_filename=None):
     # Check if the database needs to be initialized
 
     if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
-        from project.queue_manager import update_queue
+        from project.services.queue_service import update_queue
 
         scheduler = BackgroundScheduler(job_defaults={'max_instances': 2})
         scheduler.add_job(func=update_queue, args=[app], trigger="interval", seconds=5)
@@ -66,7 +65,7 @@ def initialize_extensions(app):
     from project.models.subset import Subset
 
     # Check if the database needs to be initialized
-    recreate = True
+    recreate = False
     if recreate:
         with app.app_context():
             db.drop_all()
@@ -132,9 +131,13 @@ def register_blueprints(app):
     from project.views import home
     from project.views import upload
     from project.views import upload_classes
+    from project.views import users
+    from project.views import project
 
     app.register_blueprint(upload_classes.mod)
     app.register_blueprint(home.mod)
-    app.register_blueprint(upload.mod)
+    app.register_blueprint(upload.REQUEST_API)
+    app.register_blueprint(users.REQUEST_API)
+    app.register_blueprint(project.REQUEST_API)
 
 # TODO Fix observer functionality
