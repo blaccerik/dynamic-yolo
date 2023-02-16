@@ -90,6 +90,27 @@ def get_project_info(project_code: int):
     return project_info
 
 
+def change_settings(project_code: int, new_settings: dict) -> int:
+    # TODO add exceptions to get rid of this returning numbers situation
+    # TODO maybe add a check in schema to filter these settings so that
+    #  the values cant be 0 for example or bigger than 1
+    project = Project.query.get(project_code)
+
+    if not project:
+        return 1
+
+    project_settings = ProjectSettings.query.get(project_code)
+
+    if not project_settings:
+        return 2
+
+    for k, v in new_settings.items():
+        setattr(project_settings, k, v)
+
+    db.session.commit()
+    return 0
+
+
 def get_all_projects():
     """
     Get all projects
