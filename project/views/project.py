@@ -1,3 +1,6 @@
+import io
+import zipfile
+import tarfile
 from io import BytesIO
 
 import PIL
@@ -5,6 +8,7 @@ from flask import Blueprint, request, jsonify
 from marshmallow import ValidationError
 from werkzeug.utils import secure_filename
 
+from project.schemas.zip_upload import ZipUpload
 from project.services.file_upload_service import upload_files
 from project.models.annotation import Annotation
 from project.models.image import Image
@@ -24,11 +28,13 @@ text_types = [
     "text/plain"
 ]
 
+zip_types = [
+    "application/gzip"
+]
+
 
 def _filter_files(files):
     for f in files:
-        print(f)
-        print(f.content_type)
         if f.content_type in image_types or f.content_type in text_types:
             for item in _filestorage_to_db_item(f):
                 yield item
@@ -131,3 +137,48 @@ def get_project_models(project_id):
     serialized_models = model_schema.dump(project_models)
 
     return serialized_models
+
+def _check_zip_file(file):
+    content = file.stream.read()
+    file.stream.close()
+    tar = tarfile.open(fileobj=BytesIO(content))
+    for item in tar:
+        if not item.isfile():
+            continue
+        _bytes = tar.extractfile(item.name).read()
+        for db_object in _bytes_to_db_object(_bytes, item.name):
+            yield db_object
+
+def _bytes_to_db_object(_bytes, name: str):
+
+    if name.endswith(".txt"):
+        text = str(_bytes, "utf-8")
+        name = secure_filename(name).split(".")[0]
+        _list = _text_to_annotations(text, name)
+        return _list
+    elif name.endswith(".png") or name.endswith(".jpeg"):  # image file
+        io_bytes = BytesIO(_bytes)
+        img = PIL.Image.open(io_bytes)
+        name = secure_filename(name).split(".")[0]
+        return (Image(image=_bytes, width=img.size[0], height=img.size[1]), name),
+    else:
+        raise ValidationError("")
+
+
+
+@REQUEST_API.route('/<int:project_id>/zip-upload', methods=["POST"])
+def zip_upload(project_id: int):
+    data = ZipUpload().load(request.form)
+    uploader = data["uploader_name"]
+    split = data["split"]
+    file = request.files.get("file")
+    if file is None:
+        raise ValidationError("file field not found")
+    # check file
+    uploaded_files = [f for f in _check_zip_file(file)]
+
+    # upload file
+    passed, failed, annotations = upload_files(uploaded_files, project_id, uploader, split)
+
+    return jsonify(
+        {'message': f'Uploaded {passed} images and {annotations} annotations. There were {failed} failed images'}), 201
