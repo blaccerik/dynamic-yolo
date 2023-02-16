@@ -8,6 +8,7 @@ from project.models.project_status import ProjectStatus
 def get_default_status_id():
     return ProjectStatus.query.filter(ProjectStatus.name.like("idle")).first().id
 
+
 class Project(db.Model):
     id = Column(BigInteger, primary_key=True)
     name = Column(VARCHAR(128), nullable=False, unique=True)

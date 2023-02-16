@@ -7,5 +7,4 @@ class Model(Schema):
     added = fields.DateTime()
     total_epochs = fields.Integer()
     epochs = fields.Integer()
-    model_status_id = fields.Integer()
-    project_id = fields.Integer()
+    model_status_name = fields.String()

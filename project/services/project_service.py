@@ -1,7 +1,7 @@
 from project import db
-from project.models.annotator import Annotator
 from project.models.project import Project
 from project.models.project_settings import ProjectSettings
+from project.models.model_status import ModelStatus
 
 
 def create_project(name: str, class_nr: int) -> int:
@@ -31,8 +31,17 @@ def get_models(project_code: int):
         return None
 
     models = project.models
+    serialized_models = []
 
-    return models
+    # Add the model_status_name for better readability
+    for model in models:
+        model_dict = model.__dict__
+        model_status = ModelStatus.query.get(model.model_status_id)
+        model_dict['model_status_name'] = model_status.name
+        model_dict['model'] = model
+        serialized_models.append(model_dict)
+
+    return serialized_models
 
 
 def get_all_projects():

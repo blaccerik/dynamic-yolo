@@ -332,15 +332,6 @@
             "type": "integer",
             "description": "Number of epochs completed"
           },
-          "model_status_id": {
-            "type": "integer",
-            "description": "ID of the model's status"
-          },
-          "project_id": {
-            "type": "integer",
-            "format": "int64",
-            "description": "ID of the project the model belongs to"
-          },
           "model": {
             "type": "string",
             "format": "binary",

@@ -129,4 +129,5 @@ def get_project_models(project_id):
 
     model_schema = Model(many=True)
     serialized_models = model_schema.dump(project_models)
+
     return serialized_models
