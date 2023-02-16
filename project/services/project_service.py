@@ -19,6 +19,21 @@ def create_project(name: str, class_nr: int) -> int:
     db.session.commit()
     return project.id
 
+
+def get_models(project_code: int):
+    """
+    Get all models of the project
+    :param project_code:
+    :return:
+    """
+    project = Project.query.get(project_code)
+    if project is None:
+        return None
+
+    models = project.models
+
+    return models
+
 # def get_all():
 #     """
 #     Get all projects

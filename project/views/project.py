@@ -9,8 +9,10 @@ from project.services.file_upload_service import upload_files
 from project.models.annotation import Annotation
 from project.models.image import Image
 from project.services.project_service import create_project
+from project.services.project_service import get_models
 from project.schemas.project import Project
 from project.schemas.upload import Upload
+from project.schemas.model import Model
 
 REQUEST_API = Blueprint('project', __name__, url_prefix="/projects")
 
@@ -107,3 +109,15 @@ def create_record():
         return jsonify({'error': 'Project with that name already exists'}), 409
 
     return jsonify({'message': f'Project {code} created successfully'}), 201
+
+
+@REQUEST_API.route('/<int:project_id>/models', methods=['GET'])
+def get_project_models(project_id):
+    project_models = get_models(project_id)
+
+    if project_models is None:
+        return jsonify({'error': 'Project with that id does not exist'}), 404
+
+    model_schema = Model(many=True)
+    serialized_models = model_schema.dump(project_models)
+    return serialized_models
