@@ -74,7 +74,8 @@ def initialize_extensions(app):
             # static data
             ps1 = ProjectStatus(name="busy")
             ps2 = ProjectStatus(name="idle")
-            db.session.add_all([ps1, ps2])
+            ps3 = ProjectStatus(name="error")
+            db.session.add_all([ps1, ps2, ps3])
             db.session.commit()
 
             ms1 = ModelStatus(name="ready")
