@@ -47,7 +47,6 @@ def get_models(project_code: int):
 
         result = {'model_status_name': model_dict['model_status_name'],
                   'id': model_dict['id'],
-                  'parent_model_id': model_dict['parent_model_id'],
                   'added': model_dict['added']}
         serialized_models.append(result)
 

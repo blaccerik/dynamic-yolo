@@ -353,11 +353,6 @@
             "format": "int64",
             "description": "ID of the model"
           },
-          "parent_model_id": {
-            "type": "integer",
-            "format": "int64",
-            "description": "ID of the parent model, if any"
-          },
           "added": {
             "type": "string",
             "format": "date-time",
@@ -442,9 +437,8 @@
             "type": "integer",
             "format": "int32"
           },
-          "model_status_id": {
-            "type": "integer",
-            "format": "int32"
+          "model_status_name": {
+            "type": "string"
           },
           "project_id": {
             "type": "integer",
