@@ -202,7 +202,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/model"
+                    "$ref": "#/components/schemas/simple_model_info"
                   }
                 }
               }
@@ -210,6 +210,49 @@
           },
           "404": {
             "description": "Project not found"
+          }
+        }
+      }
+    },
+    "/projects/{project_id}/models/{model_id}": {
+      "get": {
+        "tags": [
+          "Project Requests"
+        ],
+        "summary": "Get info about a model",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "description": "ID of the project",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/project_id"
+            }
+          },
+          {
+            "in": "path",
+            "name": "model_id",
+            "description": "ID of the model",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/model_id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Model details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Model"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project or model not found"
           }
         }
       }
@@ -298,9 +341,13 @@
           }
         }
       },
-      "model": {
+      "simple_model_info": {
         "type": "object",
         "properties": {
+          "model_status_name": {
+            "type": "string",
+            "description": "Status of the model"
+          },
           "id": {
             "type": "integer",
             "format": "int64",
@@ -315,39 +362,193 @@
             "type": "string",
             "format": "date-time",
             "description": "Date and time the model was added"
+          }
+        }
+      },
+      "model_id": {
+        "type": "integer"
+      },
+      "Image": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "image": {
+            "type": "string",
+            "format": "binary"
+          },
+          "height": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "width": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "project_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "annotations": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "description": "ID-s of annotations"
+            }
+          },
+          "models": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "description": "ID-s of models"
+            }
+          },
+          "subset_id": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "required": [
+          "id",
+          "image",
+          "height",
+          "width",
+          "project_id",
+          "subset_id"
+        ]
+      },
+      "Model": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "parent_model_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "added": {
+            "type": "string",
+            "format": "date-time"
           },
           "total_epochs": {
             "type": "integer",
-            "description": "Total number of epochs the model was trained for"
+            "format": "int32"
           },
           "epochs": {
             "type": "integer",
-            "description": "Number of epochs completed"
+            "format": "int32"
           },
-          "model": {
-            "type": "string",
-            "format": "binary",
-            "description": "The binary representation of the model"
+          "model_status_id": {
+            "type": "integer",
+            "format": "int32"
           },
-          "model_results_id": {
+          "project_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "model_results": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/ModelResults"
-            },
-            "description": "List of IDs of the model's results"
-          },
-          "parent": {
-            "$ref": "#/components/schemas/Model",
-            "description": "The parent model, if any"
+              "type": "integer",
+              "description": "ID-s of results"
+            }
           },
           "images": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Image"
-            },
-            "description": "List of images associated with the model"
+              "type": "integer",
+              "description": "ID-s of images"
+            }
           }
-        }
+        },
+        "required": [
+          "id",
+          "added",
+          "total_epochs",
+          "epochs",
+          "model_status_id",
+          "project_id"
+        ]
+      },
+      "ModelImage": {
+        "type": "object",
+        "properties": {
+          "model_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "image_id": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "required": [
+          "model_id",
+          "image_id"
+        ]
+      },
+      "ModelResults": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "model_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "subset_id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "epoch": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "metric_precision": {
+            "type": "number",
+            "format": "float"
+          },
+          "metric_recall": {
+            "type": "number",
+            "format": "float"
+          },
+          "metric_map_50": {
+            "type": "number",
+            "format": "float"
+          },
+          "metric_map_50_95": {
+            "type": "number",
+            "format": "float"
+          },
+          "val_box_loss": {
+            "type": "number",
+            "format": "float"
+          },
+          "val_obj_loss": {
+            "type": "number",
+            "format": "float"
+          },
+          "val_cls_loss": {
+            "type": "number",
+            "format": "float"
+          }
+        },
+        "required": [
+          "id",
+          "model_id",
+          "subset_id",
+          "metric_precision",
+          "metric_recall",
+          "metric_map_50",
+          "metric_map_50_95",
+          "val_box"
+        ]
       }
     }
   }

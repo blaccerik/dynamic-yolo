@@ -44,8 +44,12 @@ def get_models(project_code: int):
         model_dict = model.__dict__
         model_status = ModelStatus.query.get(model.model_status_id)
         model_dict['model_status_name'] = model_status.name
-        model_dict['model'] = model
-        serialized_models.append(model_dict)
+
+        result = {'model_status_name': model_dict['model_status_name'],
+                  'id': model_dict['id'],
+                  'parent_model_id': model_dict['parent_model_id'],
+                  'added': model_dict['added']}
+        serialized_models.append(result)
 
     return serialized_models
 
