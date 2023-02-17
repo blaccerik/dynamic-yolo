@@ -12,10 +12,12 @@ from project.schemas.zip_upload import ZipUpload
 from project.services.file_upload_service import upload_files
 from project.models.annotation import Annotation
 from project.models.image import Image
-from project.services.project_service import create_project, get_models, get_all_projects
+from project.services.project_service import create_project, get_models, get_all_projects, get_project_info, \
+    change_settings
 from project.schemas.project import Project
 from project.schemas.upload import Upload
 from project.schemas.model import Model
+from project.schemas.projectsettings import ProjectSettingsSchema
 
 REQUEST_API = Blueprint('project', __name__, url_prefix="/projects")
 
@@ -75,17 +77,10 @@ def _filestorage_to_db_item(f):
 
 
 """
-/api/projects/ -> get projects +e
-/api/projects/ -> post create + 
-/api/projects/43 -> get info +
 /api/projects/43/images -> ?page=1&number=20 ##
-/api/projects/43/settings -> put change settings 
-/api/projects/43/upload -> post upload images +e
-/api/projects/43/models get models +
 /api/projects/43/models/3 get 1 model info +
 /api/projects/43/models/3/download get download model +
 
-/api/users/ -> post create +e
 /api/queue -> get +
 /api/queue -> post add project ##
 """
@@ -124,6 +119,34 @@ def upload(project_id: int):
 
     return jsonify(
         {'message': f'Uploaded {passed} images and {annotations} annotations. There were {failed} failed images'}), 201
+
+
+@REQUEST_API.route('/<int:project_id>', methods=['GET'])
+def get_info(project_id):
+    project_info = get_project_info(project_id)
+
+    if project_info is None:
+        return jsonify({'error': 'Project with that id does not exist'}), 404
+
+    return jsonify(project_info)
+
+
+@REQUEST_API.route('/<int:project_id>/settings', methods=['PUT'])
+def change_project_settings(project_id):
+    data = request.json
+    errors = ProjectSettingsSchema().validate(data)
+
+    if errors:
+        return jsonify({'error': f'Please check the following fields: {errors}'}), 400
+
+    error_code = change_settings(project_id, data)
+
+    if error_code == 1:
+        return jsonify({'error': f'Project with the id of {project_id} does not exist!'}), 404
+    if error_code == 2:
+        return jsonify({'error': f'Project with the id of {project_id} does not have a settings file!'}), 404
+
+    return jsonify({'message': f'Successfully updated these settings:{data}'}), 201
 
 
 @REQUEST_API.route('/<int:project_id>/models', methods=['GET'])

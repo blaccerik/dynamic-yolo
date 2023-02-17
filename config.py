@@ -8,6 +8,7 @@ class Config(object):
     # ENV = 'development'
     # DEBUG = True
     # TESTING = False
+    JSON_SORT_KEYS = False
     SECRET_KEY = os.getenv('SECRET_KEY')
     SQLALCHEMY_DATABASE_URI = \
         f"postgresql://{os.environ['DB_USERNAME']}:{os.environ['DB_PASSWORD']}@localhost/{os.environ['DB_NAME']}"
@@ -25,7 +26,7 @@ class DevelopmentConfig(Config):
     FLASK_DEBUG = True
     DEBUG = True
     # TEMPLATES_AUTO_RELOAD = True
-    #change to true later
+    # change to true later
 
 
 class TestingConfig(Config):
