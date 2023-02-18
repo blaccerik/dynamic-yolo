@@ -256,7 +256,7 @@
         }
       }
     },
-    "/api/projects/{project_id}/images": {
+    "/projects/{project_id}/images": {
       "get": {
         "tags": [
           "Project Requests"
