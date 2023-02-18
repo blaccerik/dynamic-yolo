@@ -305,6 +305,9 @@
     },
     "/queue": {
       "get": {
+        "tags": [
+          "Queue Requests"
+        ],
         "summary": "Get the queue",
         "responses": {
           "200": {
@@ -326,6 +329,9 @@
         }
       },
       "post": {
+        "tags": [
+          "Queue Requests"
+        ],
         "summary": "Add a new project to the queue",
         "parameters": [
           {
@@ -354,6 +360,44 @@
           },
           "404": {
             "description": "Project not found"
+          }
+        }
+      }
+    },
+    "/images/{image_id}": {
+      "get": {
+        "tags": [
+          "Images Requests"
+        ],
+        "summary": "Get image by ID",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "image_id",
+            "description": "ID of the image to retrieve",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Image not found"
+          },
+          "500": {
+            "description": "Internal server error"
           }
         }
       }
