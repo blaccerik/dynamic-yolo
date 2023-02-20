@@ -12,7 +12,6 @@ db = SQLAlchemy()
 APP_ROOT_PATH = pathlib.Path(__file__).parent.resolve()
 
 
-
 # ----------------------------
 # Application Factory Function
 # ----------------------------
@@ -34,7 +33,7 @@ def create_app(config_filename=None):
     # Check if the database needs to be initialized
 
     if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
-        from project.queue_manager import update_queue
+        from project.services.queue_service import update_queue
 
         scheduler = BackgroundScheduler(job_defaults={'max_instances': 2})
         scheduler.add_job(func=update_queue, args=[app], trigger="interval", seconds=5)
@@ -66,7 +65,7 @@ def initialize_extensions(app):
     from project.models.subset import Subset
 
     # Check if the database needs to be initialized
-    recreate = True
+    recreate = False
     if recreate:
         with app.app_context():
             db.drop_all()
@@ -75,7 +74,8 @@ def initialize_extensions(app):
             # static data
             ps1 = ProjectStatus(name="busy")
             ps2 = ProjectStatus(name="idle")
-            db.session.add_all([ps1, ps2])
+            ps3 = ProjectStatus(name="error")
+            db.session.add_all([ps1, ps2, ps3])
             db.session.commit()
 
             ms1 = ModelStatus(name="ready")

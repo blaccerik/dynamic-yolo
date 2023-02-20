@@ -1,13 +1,10 @@
-import time
-
-from sqlalchemy import func, asc, or_
+from sqlalchemy import func, asc
 
 from project import db
-from project.models.model import Model
 from project.models.project_status import ProjectStatus
 from project.models.project import Project
 from project.models.queue import Queue
-from project.training_manager import start_training
+from project.services.training_service import start_training
 
 
 def update_queue(app):
@@ -24,7 +21,6 @@ def update_queue(app):
         # check if anything is training
         ps = ProjectStatus.query.filter(ProjectStatus.name.like("busy")).first()
         entry = Project.query.filter(Project.project_status_id == ps.id).first()
-        print(entry)
         if entry is not None:
             return
 
@@ -33,9 +29,15 @@ def update_queue(app):
 
         # update project status
         project = Project.query.get(project_id)
-        project.project_status_id = ps.id
-        db.session.add(project)
-        db.session.commit()
+
+        # project cant be in error state
+        ps_error = ProjectStatus.query.filter(ProjectStatus.name.like("error")).first()
+        start = False
+        if project.project_status_id != ps_error.id:
+            project.project_status_id = ps.id
+            db.session.add(project)
+            db.session.commit()
+            start = True
 
         # remove from queue
         db.session.delete(first)
@@ -47,8 +49,21 @@ def update_queue(app):
             db.session.add(q)
         db.session.commit()
 
+        # dont train project if its in error state
+        if not start:
+            print("failed")
+            return
+
         # train
-        start_training(project_id)
+        error = start_training(project)
+        if error:
+            new_ps = ProjectStatus.query.filter(ProjectStatus.name.like("error")).first()
+        else:
+            new_ps = ProjectStatus.query.filter(ProjectStatus.name.like("idle")).first()
+        # set project state
+        project.project_status_id = new_ps.id
+        db.session.add(project)
+        db.session.commit()
 
 
 
