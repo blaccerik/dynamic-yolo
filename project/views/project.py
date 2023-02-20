@@ -4,7 +4,8 @@ import tarfile
 from io import BytesIO
 
 import PIL
-from flask import Blueprint, request, jsonify
+import torch
+from flask import Blueprint, request, jsonify, send_file
 from marshmallow import ValidationError
 from werkzeug.utils import secure_filename
 
@@ -13,7 +14,7 @@ from project.services.file_upload_service import upload_files
 from project.models.annotation import Annotation
 from project.models.image import Image
 from project.services.project_service import create_project, get_models, get_all_projects, get_project_info, \
-    change_settings
+    change_settings, get_model
 from project.schemas.project import Project
 from project.schemas.upload import Upload
 from project.schemas.model import Model
@@ -33,15 +34,6 @@ text_types = [
 zip_types = [
     "application/gzip"
 ]
-
-
-# def _filter_files(files):
-#     for f in files:
-#         if f.content_type in image_types or f.content_type in text_types:
-#             for item in _filestorage_to_db_item(f):
-#                 yield item
-#         else:
-#             raise ValidationError("only images and txt files can be uploaded")
 
 
 def _text_to_annotations(text, name):
@@ -71,30 +63,53 @@ def _text_to_annotations(text, name):
     return _list
 
 
-# def _filestorage_to_db_item(f):
-#     content = f.stream.read()
-#     if f.content_type in text_types:  # text file
-#         text = str(content, "utf-8")
-#         name = secure_filename(f.filename).split(".")[0]
-#         _list = _text_to_annotations(text, name)
-#         f.stream.close()
-#         return _list
-#     else:  # image file
-#         io_bytes = BytesIO(content)
-#         img = PIL.Image.open(io_bytes)
-#         f.stream.close()
-#         name = secure_filename(f.filename).split(".")[0]
-#         return (Image(image=content, width=img.size[0], height=img.size[1]), name),
+def _check_files(files):
+    final_files = []
+    for file in files:
+        content = file.stream.read()
+        file.stream.close()
+        db_objects = _bytes_to_db_object(content, secure_filename(file.filename))
+        if type(db_objects) is tuple:
+            return db_objects
+        final_files.extend(db_objects)
+    return final_files
 
 
-"""
-/api/projects/43/images -> ?page=1&number=20 ##
-/api/projects/43/models/3 get 1 model info +
-/api/projects/43/models/3/download get download model +
+def _check_zip_file(file):
+    content = file.stream.read()
+    file.stream.close()
+    try:
+        tar = tarfile.open(fileobj=BytesIO(content))
+    except Exception:
+        return jsonify({'error': f'tar file could not ne opened'}), 400
+    files = []
+    for item in tar:
+        if not item.isfile():
+            continue
+        _bytes = tar.extractfile(item.name).read()
+        db_objects = _bytes_to_db_object(_bytes, item.name)
+        if type(db_objects) is tuple:
+            return db_objects
+        files.extend(db_objects)
+    return files
 
-/api/queue -> get +
-/api/queue -> post add project ##
-"""
+
+def _bytes_to_db_object(_bytes, name: str):
+    if name.endswith(".txt"):
+        text = str(_bytes, "utf-8")
+        name = name.split(".")[0]
+        _list = _text_to_annotations(text, name)
+        return _list
+    elif name.endswith(".png") or name.endswith(".jpg"):  # image file
+        io_bytes = BytesIO(_bytes)
+        try:
+            img = PIL.Image.open(io_bytes)
+        except Exception:
+            return jsonify({'error': f"Can't read file: {name}"}), 400
+        name = name.split(".")[0]
+        return [(Image(image=_bytes, width=img.size[0], height=img.size[1]), name)]
+    else:
+        return jsonify({'error': f"Can't read file: {name}"}), 400
 
 
 @REQUEST_API.route('/', methods=['POST'])
@@ -132,7 +147,7 @@ def upload(project_id: int):
     files = request.files.getlist("files")
     if files is None:
         return jsonify({'error': f'Files field not found'}), 400
-    uploaded_files= _check_files(files)
+    uploaded_files = _check_files(files)
     if type(uploaded_files) is tuple:
         return uploaded_files
     passed, failed, annotations = upload_files(uploaded_files, project_id, uploader, split)
@@ -182,52 +197,19 @@ def get_project_models(project_id):
     return serialized_models
 
 
-def _check_files(files):
-    final_files = []
-    for file in files:
-        content = file.stream.read()
-        file.stream.close()
-        db_objects = _bytes_to_db_object(content, secure_filename(file.filename))
-        if type(db_objects) is tuple:
-            return db_objects
-        final_files.extend(db_objects)
-    return final_files
+@REQUEST_API.route('/<int:project_id>/models/<int:model_id>/download', methods=['GET'])
+def download_model(project_id, model_id):
+    model = get_model(project_id, model_id)
+    if not model:
+        return jsonify({'error': 'Model with the following project_id was not found!'}), 404
 
-def _check_zip_file(file):
-    content = file.stream.read()
-    file.stream.close()
-    try:
-        tar = tarfile.open(fileobj=BytesIO(content))
-    except Exception:
-        return jsonify({'error': f'tar file could not ne opened'}), 400
-    files = []
-    for item in tar:
-        if not item.isfile():
-            continue
-        _bytes = tar.extractfile(item.name).read()
-        db_objects = _bytes_to_db_object(_bytes, item.name)
-        if type(db_objects) is tuple:
-            return db_objects
-        files.extend(db_objects)
-    return files
-
-def _bytes_to_db_object(_bytes, name: str):
-    if name.endswith(".txt"):
-        text = str(_bytes, "utf-8")
-        name = name.split(".")[0]
-        _list = _text_to_annotations(text, name)
-        return _list
-    elif name.endswith(".png") or name.endswith(".jpg"):  # image file
-        io_bytes = BytesIO(_bytes)
-        try:
-            img = PIL.Image.open(io_bytes)
-        except Exception:
-            return jsonify({'error': f"Can't read file: {name}"}), 400
-        name = name.split(".")[0]
-        return [(Image(image=_bytes, width=img.size[0], height=img.size[1]), name)]
-    else:
-        return jsonify({'error': f"Can't read file: {name}"}), 400
-
+    binary_data = model.model
+    pt_data = torch.load(io.BytesIO(binary_data))
+    pt_file = io.BytesIO()
+    torch.save(pt_data, pt_file)
+    pt_file.seek(0)
+    return send_file(pt_file, mimetype='application/octet-stream', as_attachment=True,
+                     download_name=f'model_{model_id}.pt')
 
 
 @REQUEST_API.route('/<int:project_id>/zip-upload', methods=["POST"])
