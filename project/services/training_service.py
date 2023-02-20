@@ -88,8 +88,7 @@ class TrainSession:
 
         # update database
         db.session.add(self.db_model)
-        db.session.flush()
-
+        db.session.commit()
         self.project = project
         self.project_settings = project_settings
 

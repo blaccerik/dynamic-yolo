@@ -1,5 +1,5 @@
 from project import db
-from sqlalchemy import func
+from sqlalchemy import func, and_
 from project.models.annotation import Annotation
 from project.models.image import Image
 from project.models.model import Model
@@ -68,11 +68,16 @@ def get_project_info(project_code: int):
     test_subset_id = Subset.query.filter_by(name='test').first().id
     train_subset_id = Subset.query.filter_by(name='train').first().id
 
-    training_images = Image.query.filter_by(project_id=project_code, subset_id=train_subset_id).all()
-    test_images = Image.query.filter_by(project_id=project_code, subset_id=test_subset_id).all()
-
-    test_images_annotations = Annotation.query.join(Image).join(Subset).filter(Subset.name == 'test').all()
-    training_images_annotations = Annotation.query.join(Image).join(Subset).filter(Subset.name == 'train').all()
+    training_images = Image.query.filter_by(project_id=project_code, subset_id=train_subset_id).count()
+    test_images = Image.query.filter_by(project_id=project_code, subset_id=test_subset_id).count()
+    test_images_annotations = Annotation.query.join(Image).join(Subset).filter(and_(
+        Subset.id == test_subset_id,
+        Annotation.project_id == project_code
+    )).count()
+    training_images_annotations = Annotation.query.join(Image).join(Subset).filter(and_(
+        Subset.id == train_subset_id,
+        Annotation.project_id == project_code
+    )).count()
 
     total_models_in_project = len(project.models)
 
@@ -81,15 +86,13 @@ def get_project_info(project_code: int):
     project_info = {
         'name': project.name,
         'status': project_status_name,
-        'train_images_amount': len(training_images),
-        'train_annotations': len(training_images_annotations),
-        'test_images_amount': len(test_images),
-        'test_annotations': len(test_images_annotations),
+        'train_images_amount': training_images,
+        'train_annotations': training_images_annotations,
+        'test_images_amount': test_images,
+        'test_annotations': test_images_annotations,
         'amount_of_models': total_models_in_project,
         'total_epochs_trained': total_epochs
-
     }
-
     return project_info
 
 
