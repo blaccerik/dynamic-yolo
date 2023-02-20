@@ -20,6 +20,7 @@ from project.models.project_status import ProjectStatus
 from project.models.project import Project
 from project.models.project_settings import ProjectSettings
 
+
 def add_results_to_db(results, maps, model_id, subset_id, epoch=None) -> ModelResults:
     metric_precision, metric_recall, metric_map_50, metric_map_50_95, val_box_loss, val_obj_loss, val_cls_loss = results
 
@@ -57,6 +58,7 @@ class TrainSession:
         self.ms_train = ModelStatus.query.filter(ModelStatus.name.like("training")).first()
         self.ms_test = ModelStatus.query.filter(ModelStatus.name.like("testing")).first()
         self.ms_ready = ModelStatus.query.filter(ModelStatus.name.like("ready")).first()
+        self.ms_error = ModelStatus.query.filter(ModelStatus.name.like("error")).first()
 
         self.ss_test_id = ss_test_id
         self.ss_train_id = ss_train_id
@@ -69,10 +71,10 @@ class TrainSession:
         if prev_model_id is not None:  # use prev model
             prev_model = Model.query.get(prev_model_id)
             model = prev_model.model
-
-            if model is None: # model "exists" but weights are none
+            if model is None:  # model "exists" but weights are none
                 self.new_model = True
             else:
+                model = prev_model.model
                 total = prev_model.total_epochs
                 self.new_model = False
                 self.db_model.parent_model_id = prev_model_id
@@ -86,13 +88,7 @@ class TrainSession:
 
         # update database
         db.session.add(self.db_model)
-        db.session.flush()
-
-        project.latest_model_id = self.db_model.id
-
-        db.session.add(project)
         db.session.commit()
-
         self.project = project
         self.project_settings = project_settings
 
@@ -137,6 +133,7 @@ class TrainSession:
         setattr(opt, "save_conf", True)
         setattr(opt, "conf_thres", self.project_settings.min_confidence_threshold)
         setattr(opt, "iou_thres", self.project_settings.min_iou_threshold)
+        setattr(opt, "imgsz", [self.project_settings.img_size, self.project_settings.img_size])
 
         setattr(opt, "project", f"{APP_ROOT_PATH}/yolo/data/pretest_results")
         setattr(opt, "name", "yolo_test")
@@ -243,9 +240,7 @@ class TrainSession:
         # change some values
         setattr(opt, "data", f"{APP_ROOT_PATH}/yolo/data/data.yaml")
         setattr(opt, "batch_size", self.project_settings.batch_size)
-        setattr(opt, "img", self.project_settings.img_size)
         setattr(opt, "imgsz", self.project_settings.img_size)
-        setattr(opt, "img_size", self.project_settings.img_size)
         setattr(opt, "epochs", self.project_settings.epochs)
 
         # setattr(opt, "noval", True)  # validate only last epoch
@@ -265,10 +260,10 @@ class TrainSession:
         setattr(opt, "db_train_subset_id", self.ss_train_id)
         try:
             train.main(opt)  # long process
-        except OutOfMemoryError:
-            return True
-        except RuntimeError: # RuntimeError: Unable to find a valid cuDNN algorithm to run convolution
-            # should be the same as out of memory
+        except (OutOfMemoryError, RuntimeError):
+            self.db_model.model_status_id = self.ms_error.id
+            db.session.add(self.db_model)
+            db.session.commit()
             return True
 
         # read model weights
@@ -295,6 +290,9 @@ class TrainSession:
         setattr(opt, "task", "test")
         setattr(opt, "project", f"{APP_ROOT_PATH}/yolo/data/results")
         setattr(opt, "name", "yolo_test")
+
+        setattr(opt, "batch_size", self.project_settings.batch_size)
+        setattr(opt, "imgsz", self.project_settings.img_size)
         # setattr(opt, "source", "app/yolo/data/test")
         # setattr(opt, "nosave", True)
         # setattr(opt, "project", "app/yolo/data/results")
@@ -305,9 +303,13 @@ class TrainSession:
         # run model
         # todo dont save results
         settings = vars(opt)
-        # settings["compute_loss"] = True
-        # print(**vars(opt))
-        results, maps, t = val.run(**settings)
+        try:
+            results, maps, t = val.run(**settings)
+        except (OutOfMemoryError, RuntimeError):
+            self.db_model.model_status_id = self.ms_error.id
+            db.session.add(self.db_model)
+            db.session.commit()
+            return True
         mr = add_results_to_db(results, maps, self.db_model.id, self.ss_test_id)
         # t holds speeds per image, [a, b, c]
         # a - init time
@@ -318,6 +320,7 @@ class TrainSession:
         if mr.metric_map_50 < self.project_settings.minimal_map_50_threshold:
             from project.services.queue_service import add_to_queue  # avoid circular import
             add_to_queue(self.project.id)
+        return False
 
     def cleanup(self):
         # if os.path.exists("project/yolo/data"):
@@ -325,7 +328,9 @@ class TrainSession:
 
         # update model
         self.db_model.model_status_id = self.ms_ready.id
+        self.project.latest_model_id = self.db_model.id
         db.session.add(self.db_model)
+        db.session.add(self.project)
         db.session.commit()
 
 def initialize_yolo_folders():
@@ -409,8 +414,12 @@ def start_training(project: Project) -> bool:
     ts.load_data()
     error = ts.train()
     if error:
+        print("Out of memory while training")
         return True
-    ts.test()
+    error = ts.test()
+    if error:
+        print("Out of memory while testing")
+        return True
     ts.cleanup()
     return False
 

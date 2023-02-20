@@ -66,7 +66,7 @@ def initialize_extensions(app):
     from project.models.subset import Subset
 
     # Check if the database needs to be initialized
-    recreate = False
+    recreate = True
     if recreate:
         with app.app_context():
             db.drop_all()
@@ -82,7 +82,8 @@ def initialize_extensions(app):
             ms1 = ModelStatus(name="ready")
             ms2 = ModelStatus(name="training")
             ms3 = ModelStatus(name="testing")
-            db.session.add_all([ms1, ms2, ms3])
+            ms4 = ModelStatus(name="error")
+            db.session.add_all([ms1, ms2, ms3, ms4])
             db.session.commit()
 
             im1 = InitialModel(name="yolov5n")
