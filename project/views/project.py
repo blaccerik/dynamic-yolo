@@ -166,7 +166,7 @@ def change_project_settings(project_id):
     if error_code == 2:
         return jsonify({'error': f'Project with the id of {project_id} does not have a settings file!'}), 404
 
-    return jsonify({'message': f'Successfully updated these settings:{data}'}), 201
+    return jsonify({'message': f'Successfully updated these settings: {data}'}), 201
 
 
 @REQUEST_API.route('/<int:project_id>/models', methods=['GET'])

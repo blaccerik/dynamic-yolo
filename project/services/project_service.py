@@ -110,7 +110,16 @@ def change_settings(project_code: int, new_settings: dict) -> int:
     for k, v in new_settings.items():
         setattr(project_settings, k, v)
 
+    # update project if its in error state
+    idle_ps = ProjectStatus.query.filter(ProjectStatus.name.like("idle")).first()
+    error_ps = ProjectStatus.query.filter(ProjectStatus.name.like("error")).first()
+    if project.project_status_id == error_ps.id:
+        project.project_status_id = idle_ps.id
+        db.session.add(project)
+    db.session.add(project_settings)
     db.session.commit()
+
+
     return 0
 
 
