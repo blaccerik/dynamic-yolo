@@ -131,3 +131,14 @@ def get_all_projects():
     Get all projects
     """
     return Project.query.all()
+
+
+def get_model(project_code: int, model_code: int):
+    """
+    Return the project that was asked for.
+    :param project_code:
+    :param model_code:
+    :return:
+    """
+
+    return Model.query.filter_by(project_id=project_code, id=model_code).first()
