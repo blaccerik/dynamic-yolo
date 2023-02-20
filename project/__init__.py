@@ -5,6 +5,7 @@ import pathlib
 from apscheduler.schedulers.background import BackgroundScheduler
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
+from werkzeug.serving import is_running_from_reloader
 
 db = SQLAlchemy()
 
@@ -30,9 +31,9 @@ def create_app(config_filename=None):
     initialize_extensions(app)
     register_blueprints(app)
 
-    # Check if the database needs to be initialized
+    # # Check if the database needs to be initialized
 
-    if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
+    if not is_running_from_reloader():
         from project.services.queue_service import update_queue
 
         scheduler = BackgroundScheduler(job_defaults={'max_instances': 2})
