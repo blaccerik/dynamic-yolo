@@ -132,9 +132,11 @@ def register_blueprints(app):
     from project.views import home
     from project.views import upload
     from project.views import upload_classes
+    from project.exceptions import project_not_found
 
     app.register_blueprint(upload_classes.mod)
     app.register_blueprint(home.mod)
     app.register_blueprint(upload.mod)
+    app.register_blueprint(project_not_found.project_not_found_error)
 
 # TODO Fix observer functionality
