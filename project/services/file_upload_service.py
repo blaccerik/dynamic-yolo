@@ -1,3 +1,5 @@
+from marshmallow import ValidationError
+
 from project import db
 from project.models.annotation import Annotation
 from project.models.annotator import Annotator
@@ -73,15 +75,15 @@ def upload_files(files: list, project_code: int, uploader: str, split: str) -> (
 
     annotator = Annotator.query.filter_by(name=uploader).first()
     if annotator is None:
-        raise Exception("ano")
+        raise ValidationError({"error":  f"User not found"})
 
     project = Project.query.get(project_code)
     unknown_project = Project.query.filter_by(name="unknown").first()
     if project is None:
-        raise Exception("project")
+        raise ValidationError({"error":  f"Project not found"})
 
     if split not in ["test", "train", "random"]:
-        raise Exception(f"unknown split {split}")
+        raise ValidationError({"error": f"Unknown split {split}"})
     ps = ProjectSettings.query.get(project.id)
     ratio = ps.train_test_ratio
 

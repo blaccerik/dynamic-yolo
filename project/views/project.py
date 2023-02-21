@@ -36,8 +36,10 @@ zip_types = [
 ]
 
 
-def _text_to_annotations(text, name):
+def _text_to_annotations(content, filename):
     _list = []
+    name = filename.split(".")[0]
+    text = str(content, "utf-8")
     for line in text.splitlines():
         try:
             nr, x, y, w, h = line.strip().split(" ")
@@ -48,71 +50,68 @@ def _text_to_annotations(text, name):
             h = float(h)
             # check ranges
             if nr < 0:
-                return jsonify({'error': f"File: {name}.txt did not yolo format"}), 400
+                raise ValidationError({"error":  f"File: {name}.txt did not yolo format"})
             if x > 1 or x < 0:
-                return jsonify({'error': f"File: {name}.txt did not yolo format"}), 400
+                raise ValidationError({"error":  f"File: {name}.txt did not yolo format"})
             if y > 1 or y < 0:
-                return jsonify({'error': f"File: {name}.txt did not yolo format"}), 400
+                raise ValidationError({"error":  f"File: {name}.txt did not yolo format"})
             if w > 1 or w < 0:
-                return jsonify({'error': f"File: {name}.txt did not yolo format"}), 400
+                raise ValidationError({"error":  f"File: {name}.txt did not yolo format"})
             if h > 1 or h < 0:
-                return jsonify({'error': f"File: {name}.txt did not yolo format"}), 400
+                raise ValidationError({"error":  f"File: {name}.txt did not yolo format"})
             _list.append((Annotation(x_center=x, y_center=y, width=w, height=h, class_id=nr), name))
         except Exception as e:
-            return jsonify({'error': f"Can't read file: {name}.txt"}), 400
+            raise ValidationError({"error":  f"Can't read file: {name}.txt"})
+            # return jsonify({'error': f"Can't read file: {name}.txt"}), 400
     return _list
+
+
+def _bytes_to_image(content, filename):
+    try:
+        img = PIL.Image.open(io.BytesIO(content))
+    except Exception:
+        raise ValidationError({"error": f"Can't read file: {filename}"})
+    name = filename.split(".")[0]
+    return Image(image=content, width=img.size[0], height=img.size[1]), name
 
 
 def _check_files(files):
     final_files = []
-    print(files)
     for file in files:
+        filename = secure_filename(file.filename)
         content = file.stream.read()
         file.stream.close()
-        filename = secure_filename(file.filename)
-        print(filename)
-        # db_objects = _bytes_to_db_object(content, secure_filename(file.filename))
-        # if type(db_objects) is tuple:
-        #     return db_objects
-        # final_files.extend(db_objects)
+        if filename.endswith(".txt"):
+            annotations = _text_to_annotations(content, filename)
+            final_files.extend(annotations)
+        elif filename.endswith(".png") or filename.endswith(".jpg"):
+            final_files.append(_bytes_to_image(content, filename))
+        elif filename.endswith(".tar.gz"):
+            final_files.extend(_check_zip_file(content))
+        else:
+            raise ValidationError({'error': f'not supported parsing {filename}'})
     return final_files
 
 
-def _check_zip_file(file):
-    content = file.stream.read()
-    file.stream.close()
+def _check_zip_file(content):
     try:
         tar = tarfile.open(fileobj=BytesIO(content))
     except Exception:
-        return jsonify({'error': f'tar file could not ne opened'}), 400
+        return ValidationError({'error': f'tar file could not be opened'})
     files = []
     for item in tar:
         if not item.isfile():
             continue
         _bytes = tar.extractfile(item.name).read()
-        db_objects = _bytes_to_db_object(_bytes, item.name)
-        if type(db_objects) is tuple:
-            return db_objects
-        files.extend(db_objects)
+        filename = item.name
+        if filename.endswith(".txt"):
+            files.extend(_text_to_annotations(_bytes, filename))
+        elif filename.endswith(".png") or filename.endswith(".jpg"):
+            files.append(_bytes_to_image(_bytes, filename))
+        else:
+            raise ValidationError({'error': f'not supported parsing {filename}'})
     return files
 
-
-def _bytes_to_db_object(_bytes, name: str):
-    if name.endswith(".txt"):
-        text = str(_bytes, "utf-8")
-        name = name.split(".")[0]
-        _list = _text_to_annotations(text, name)
-        return _list
-    elif name.endswith(".png") or name.endswith(".jpg"):  # image file
-        io_bytes = BytesIO(_bytes)
-        try:
-            img = PIL.Image.open(io_bytes)
-        except Exception:
-            return jsonify({'error': f"Can't read file: {name}"}), 400
-        name = name.split(".")[0]
-        return [(Image(image=_bytes, width=img.size[0], height=img.size[1]), name)]
-    else:
-        return jsonify({'error': f"Can't read file: {name}"}), 400
 
 
 @REQUEST_API.route('/', methods=['POST'])
@@ -207,36 +206,16 @@ def upload(project_id: int):
     if files is None:
         return jsonify({'error': f'Files field not found'}), 400
     uploaded_files = _check_files(files)
-    if type(uploaded_files) is tuple:
-        return uploaded_files
-    # passed, failed, annotations = upload_files(uploaded_files, project_id, uploader, split)
 
+    # check that all images have unique name
+    seen = set()
+    for f, name in uploaded_files:
+        if type(f) is not Image:
+            continue
+        if name in seen:
+            return jsonify({'error': f'Duplicate images found: {name}'}), 400
+        seen.add(name)
+    passed, failed, annotations = upload_files(uploaded_files, project_id, uploader, split)
     return jsonify(
         {'message': f'Uploaded {passed} images and {annotations} annotations. There were {failed} failed images'}), 201
 
-# @REQUEST_API.route('/<int:project_id>/zip-upload', methods=["POST"])
-# def zip_upload(project_id: int):
-#     data = request.form
-#     errors = ZipUpload().validate(data)
-#
-#     if errors:
-#         return jsonify({'error': f'Please check the following fields: {errors}'}), 400
-#
-#     uploader = data["uploader_name"]
-#     split = data["split"]
-#     file = request.files.get("file")
-#     if file is None:
-#         return jsonify({'error': "file field not found"}), 400
-#     filename = secure_filename(file.filename)
-#     if filename.endswith("tar.gz"):
-#         uploaded_files = _check_zip_file(file)
-#         if type(uploaded_files) is tuple:
-#             return uploaded_files
-#     else:
-#         return jsonify({'error': f'not supported parsing {filename}'}), 405
-#     print(uploaded_files)
-#     # # upload file
-#     # passed, failed, annotations = upload_files(uploaded_files, project_id, uploader, split)
-#
-#     return jsonify(
-#         {'message': f'Uploaded {passed} images and {annotations} annotations. There were {failed} failed images'}), 201
