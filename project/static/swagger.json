@@ -333,17 +333,23 @@
           "Queue Requests"
         ],
         "summary": "Add a new project to the queue",
-        "parameters": [
-          {
-            "name": "project_id",
-            "in": "path",
-            "description": "ID of the project to add to the queue",
-            "required": true,
-            "schema": {
-              "type": "integer"
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "project_id": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "project_id"
+                ]
+              }
             }
           }
-        ],
+        },
         "responses": {
           "201": {
             "description": "Added a project to the queue",

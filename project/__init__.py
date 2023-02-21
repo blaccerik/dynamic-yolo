@@ -57,15 +57,18 @@ def register_blueprints(app):
     from project.views import home
     from project.views import upload
     from project.views import upload_classes
-    from project.exceptions import project_not_found
     from project.views import users
     from project.views import project
+    from project.views import queue
+
+    from project.exceptions import project_not_found
 
     app.register_blueprint(upload_classes.mod)
     app.register_blueprint(home.mod)
     app.register_blueprint(upload.REQUEST_API)
     app.register_blueprint(users.REQUEST_API)
     app.register_blueprint(project.REQUEST_API)
+    app.register_blueprint(queue.REQUEST_API)
 
     app.register_blueprint(project_not_found.project_not_found_error)
 
