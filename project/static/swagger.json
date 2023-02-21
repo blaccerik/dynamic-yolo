@@ -107,40 +107,6 @@
         }
       }
     },
-    "/projects/{project_id}/zip-upload": {
-      "post": {
-        "tags": [
-          "Project Requests"
-        ],
-        "summary": "Upload zip file to project",
-        "parameters": [
-          {
-            "name": "project_id",
-            "in": "path",
-            "required": true,
-            "description": "Project id",
-            "schema": {
-              "$ref": "#/components/schemas/project_id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "$ref": "#/components/schemas/upload"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        }
-      }
-    },
     "/projects/{project_id}": {
       "get": {
         "tags": [
