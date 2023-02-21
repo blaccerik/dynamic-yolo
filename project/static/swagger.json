@@ -474,7 +474,7 @@
             "type": "string",
             "format": "string"
           },
-          "file": {
+          "files": {
             "type": "array",
             "items": {
               "type": "string",

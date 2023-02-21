@@ -65,13 +65,16 @@ def _text_to_annotations(text, name):
 
 def _check_files(files):
     final_files = []
+    print(files)
     for file in files:
         content = file.stream.read()
         file.stream.close()
-        db_objects = _bytes_to_db_object(content, secure_filename(file.filename))
-        if type(db_objects) is tuple:
-            return db_objects
-        final_files.extend(db_objects)
+        filename = secure_filename(file.filename)
+        print(filename)
+        # db_objects = _bytes_to_db_object(content, secure_filename(file.filename))
+        # if type(db_objects) is tuple:
+        #     return db_objects
+        # final_files.extend(db_objects)
     return final_files
 
 
@@ -134,28 +137,6 @@ def get_projects():
     return serialized_projects
 
 
-@REQUEST_API.route('/<int:project_id>/upload', methods=["POST"])
-def upload(project_id: int):
-    data = request.form
-    errors = Upload().validate(data)
-
-    if errors:
-        return jsonify({'error': f'Please check the following fields: {errors}'}), 400
-
-    uploader = data["uploader_name"]
-    split = data["split"]
-    files = request.files.getlist("files")
-    if files is None:
-        return jsonify({'error': f'Files field not found'}), 400
-    uploaded_files = _check_files(files)
-    if type(uploaded_files) is tuple:
-        return uploaded_files
-    passed, failed, annotations = upload_files(uploaded_files, project_id, uploader, split)
-
-    return jsonify(
-        {'message': f'Uploaded {passed} images and {annotations} annotations. There were {failed} failed images'}), 201
-
-
 @REQUEST_API.route('/<int:project_id>', methods=['GET'])
 def get_info(project_id):
     project_info = get_project_info(project_id)
@@ -212,29 +193,50 @@ def download_model(project_id, model_id):
                      download_name=f'model_{model_id}.pt')
 
 
-@REQUEST_API.route('/<int:project_id>/zip-upload', methods=["POST"])
-def zip_upload(project_id: int):
+@REQUEST_API.route('/<int:project_id>/upload', methods=["POST"])
+def upload(project_id: int):
     data = request.form
-    errors = ZipUpload().validate(data)
+    errors = Upload().validate(data)
 
     if errors:
         return jsonify({'error': f'Please check the following fields: {errors}'}), 400
 
     uploader = data["uploader_name"]
     split = data["split"]
-    file = request.files.get("file")
-    if file is None:
-        return jsonify({'error': "file field not found"}), 400
-    filename = secure_filename(file.filename)
-    if filename.endswith("tar.gz"):
-        uploaded_files = _check_zip_file(file)
-        if type(uploaded_files) is tuple:
-            return uploaded_files
-    else:
-        return jsonify({'error': f'not supported parsing {filename}'}), 405
-
-    # upload file
-    passed, failed, annotations = upload_files(uploaded_files, project_id, uploader, split)
+    files = request.files.getlist("files")
+    if files is None:
+        return jsonify({'error': f'Files field not found'}), 400
+    uploaded_files = _check_files(files)
+    if type(uploaded_files) is tuple:
+        return uploaded_files
+    # passed, failed, annotations = upload_files(uploaded_files, project_id, uploader, split)
 
     return jsonify(
         {'message': f'Uploaded {passed} images and {annotations} annotations. There were {failed} failed images'}), 201
+
+# @REQUEST_API.route('/<int:project_id>/zip-upload', methods=["POST"])
+# def zip_upload(project_id: int):
+#     data = request.form
+#     errors = ZipUpload().validate(data)
+#
+#     if errors:
+#         return jsonify({'error': f'Please check the following fields: {errors}'}), 400
+#
+#     uploader = data["uploader_name"]
+#     split = data["split"]
+#     file = request.files.get("file")
+#     if file is None:
+#         return jsonify({'error': "file field not found"}), 400
+#     filename = secure_filename(file.filename)
+#     if filename.endswith("tar.gz"):
+#         uploaded_files = _check_zip_file(file)
+#         if type(uploaded_files) is tuple:
+#             return uploaded_files
+#     else:
+#         return jsonify({'error': f'not supported parsing {filename}'}), 405
+#     print(uploaded_files)
+#     # # upload file
+#     # passed, failed, annotations = upload_files(uploaded_files, project_id, uploader, split)
+#
+#     return jsonify(
+#         {'message': f'Uploaded {passed} images and {annotations} annotations. There were {failed} failed images'}), 201
