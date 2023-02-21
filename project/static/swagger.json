@@ -436,6 +436,29 @@
           }
         }
       }
+    },
+    "/annotations": {
+      "get": {
+        "tags": [
+          "Annotations Requests"
+        ],
+        "summary": "Get all annotations",
+        "responses": {
+          "200": {
+            "description": "List of annotations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/simple_annotation_info"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -578,6 +601,27 @@
       },
       "model_id": {
         "type": "integer"
+      },
+      "simple_annotation_info": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "ID of the annotation"
+          },
+          "project_id": {
+            "type": "integer",
+            "description": "ID of the project"
+          },
+          "annotator_name": {
+            "type": "string",
+            "description": "Annotator of the annotation"
+          },
+          "image_id": {
+            "type": "integer",
+            "description": "ID of the image"
+          }
+        }
       },
       "Image": {
         "type": "object",
