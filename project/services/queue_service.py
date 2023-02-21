@@ -1,5 +1,3 @@
-import logging
-
 from sqlalchemy import func, asc
 
 from project import db
@@ -7,7 +5,6 @@ from project.models.project_status import ProjectStatus
 from project.models.project import Project
 from project.models.queue import Queue
 from project.services.training_service import start_training
-from project.yolo.yolov5.utils.general import LOGGER
 
 
 def update_queue(app):
@@ -69,8 +66,6 @@ def update_queue(app):
         db.session.commit()
 
 
-
-
 def add_to_queue(project_id: int):
     """
     Add project to query
@@ -91,3 +86,6 @@ def add_to_queue(project_id: int):
     db.session.add(q)
     db.session.commit()
 
+
+def fetch_queue():
+    return Queue.query.all()
