@@ -22,8 +22,8 @@ def add_project_to_queue():
     message, error = add_to_queue(project_id)
 
     if error is 1:
-        return jsonify({'message': message}), 404
+        return jsonify({'error': message}), 404
     if error is 2:
-        return jsonify({'message': message}), 404
+        return jsonify({'error': message}), 404
 
     return jsonify({'message': 'Added project to queue'}), 201
