@@ -9,7 +9,6 @@ from project.models.model import Model
 from project.models.project import Project
 from project.models.project_settings import ProjectSettings
 from project.models.project_status import ProjectStatus
-from project.models.model_status import ModelStatus
 from project.models.subset import Subset
 
 
@@ -31,33 +30,6 @@ def create_project(name: str, class_nr: int, init_model: str, img_size: int) -> 
     db.session.add(ps)
     db.session.commit()
     return project.id
-
-
-def get_models(project_code: int):
-    """
-    Get all models of the project
-    :param project_code:
-    :return:
-    """
-    project = Project.query.get(project_code)
-    if project is None:
-        return None
-
-    models = project.models
-    serialized_models = []
-
-    # Add the model_status_name for better readability
-    for model in models:
-        model_dict = model.__dict__
-        model_status = ModelStatus.query.get(model.model_status_id)
-        model_dict['model_status_name'] = model_status.name
-
-        result = {'model_status_name': model_dict['model_status_name'],
-                  'id': model_dict['id'],
-                  'added': model_dict['added']}
-        serialized_models.append(result)
-
-    return serialized_models
 
 
 def get_project_info(project_code: int):
@@ -110,7 +82,7 @@ def change_settings(project_code: int, new_settings: dict):
     project = Project.query.get(project_code)
 
     if project is None:
-        raise ValidationError({"error":  f"Project not found"})
+        raise ValidationError({"error": f"Project not found"})
 
     project_settings = ProjectSettings.query.get(project_code)
 
@@ -134,7 +106,7 @@ def get_settings(project_code: int) -> dict:
     project = Project.query.get(project_code)
 
     if project is None:
-        raise ValidationError({"error":  f"Project not found"})
+        raise ValidationError({"error": f"Project not found"})
     project_settings = ProjectSettings.query.get(project_code)
 
     if project_settings is None:
@@ -160,14 +132,3 @@ def get_all_projects():
     Get all projects
     """
     return Project.query.all()
-
-
-def get_model(project_code: int, model_code: int):
-    """
-    Return the project that was asked for.
-    :param project_code:
-    :param model_code:
-    :return:
-    """
-
-    return Model.query.filter_by(project_id=project_code, id=model_code).first()

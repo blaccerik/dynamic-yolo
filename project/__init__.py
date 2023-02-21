@@ -61,6 +61,7 @@ def register_blueprints(app):
     from project.views import project
     from project.views import queue
     from project.views import image
+    from project.views import model
 
     from project.exceptions import project_not_found
 
@@ -71,6 +72,7 @@ def register_blueprints(app):
     app.register_blueprint(project.REQUEST_API)
     app.register_blueprint(queue.REQUEST_API)
     app.register_blueprint(image.REQUEST_API)
+    app.register_blueprint(model.REQUEST_API)
 
     app.register_blueprint(project_not_found.project_not_found_error)
 
