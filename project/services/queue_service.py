@@ -72,19 +72,21 @@ def add_to_queue(project_id: int):
     """
     project = Project.query.get(project_id)
     if project is None:
-        return "project not found"
+        return "Project not found!", 1
 
     # search queue to see if project is already there
     # if it is then don't touch it
     entry = Queue.query.filter_by(project_id=project.id).first()
     if entry is not None:
-        return
+        return "Project already in queue", 2
     position = db.session.query(func.max(Queue.position)).scalar()
     if position is None:
         position = 0
     q = Queue(position=position + 1, project_id=project.id)
     db.session.add(q)
     db.session.commit()
+
+    return "Added to queue successfully", 3
 
 
 def fetch_queue():
