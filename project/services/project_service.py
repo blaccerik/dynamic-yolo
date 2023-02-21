@@ -1,7 +1,10 @@
+from marshmallow import ValidationError
+
 from project import db
 from sqlalchemy import func, and_
 from project.models.annotation import Annotation
 from project.models.image import Image
+from project.models.initial_model import InitialModel
 from project.models.model import Model
 from project.models.project import Project
 from project.models.project_settings import ProjectSettings
@@ -10,17 +13,21 @@ from project.models.model_status import ModelStatus
 from project.models.subset import Subset
 
 
-def create_project(name: str, class_nr: int) -> int:
+def create_project(name: str, class_nr: int, init_model: str, img_size: int) -> int:
     """
     Create a project
     """
     p = Project.query.filter(Project.name.like(name)).first()
     if p is not None:
         return -1
+
+    im = InitialModel.query.filter(InitialModel.name.like(init_model)).first()
+    if im is None:
+        raise ValidationError(f"Unknown model {init_model}", "init_model")
     project = Project(name=name)
     db.session.add(project)
     db.session.flush()
-    ps = ProjectSettings(id=project.id, max_class_nr=class_nr)
+    ps = ProjectSettings(id=project.id, max_class_nr=class_nr, initial_model_id=im.id, img_size=img_size)
     db.session.add(ps)
     db.session.commit()
     return project.id
@@ -61,7 +68,7 @@ def get_project_info(project_code: int):
     """
     project = Project.query.get(project_code)
     if project is None:
-        return None
+        raise ValidationError({"error": f"Project not found"})
 
     project_status_name = ProjectStatus.query.get(project.project_status_id).name
 
@@ -81,7 +88,7 @@ def get_project_info(project_code: int):
 
     total_models_in_project = len(project.models)
 
-    total_epochs = db.session.query(func.sum(Model.total_epochs)).filter(Model.project_id == project_code).scalar()
+    total_epochs = Model.query.get(project.latest_model_id).total_epochs
 
     project_info = {
         'name': project.name,
@@ -96,19 +103,19 @@ def get_project_info(project_code: int):
     return project_info
 
 
-def change_settings(project_code: int, new_settings: dict) -> int:
+def change_settings(project_code: int, new_settings: dict):
     # TODO add exceptions to get rid of this returning numbers situation
     # TODO maybe add a check in schema to filter these settings so that
     #  the values cant be 0 for example or bigger than 1
     project = Project.query.get(project_code)
 
-    if not project:
-        return 1
+    if project is None:
+        raise ValidationError({"error":  f"Project not found"})
 
     project_settings = ProjectSettings.query.get(project_code)
 
-    if not project_settings:
-        return 2
+    if project_settings is None:
+        raise ValidationError({"error": f"Project settings not found"})
 
     for k, v in new_settings.items():
         setattr(project_settings, k, v)
@@ -123,7 +130,29 @@ def change_settings(project_code: int, new_settings: dict) -> int:
     db.session.commit()
 
 
-    return 0
+def get_settings(project_code: int) -> dict:
+    project = Project.query.get(project_code)
+
+    if project is None:
+        raise ValidationError({"error":  f"Project not found"})
+    project_settings = ProjectSettings.query.get(project_code)
+
+    if project_settings is None:
+        raise ValidationError({"error": f"Project settings not found"})
+
+    name = InitialModel.query.get(project_settings.initial_model_id).name
+
+    return {
+        "max_class_nr": project_settings.max_class_nr,
+        "epochs": project_settings.epochs,
+        "batch_size": project_settings.batch_size,
+        "initial_model": name,
+        "confidence_threshold": project_settings.confidence_threshold,
+        "train_test_ratio": project_settings.train_test_ratio,
+        "minimal_map_50_threshold": project_settings.minimal_map_50_threshold,
+        "min_confidence_threshold": project_settings.min_confidence_threshold,
+        "min_iou_threshold": project_settings.min_iou_threshold
+    }
 
 
 def get_all_projects():

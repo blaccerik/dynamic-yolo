@@ -175,6 +175,35 @@
             "description": "Project not found"
           }
         }
+      },
+      "get": {
+        "tags": [
+          "Project Requests"
+        ],
+        "summary": "Get project settings",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "description": "ID of the project",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/project_id"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/get_project_settings"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/projects/{project_id}/models": {
@@ -432,6 +461,13 @@
           },
           "max_class_nr": {
             "type": "integer"
+          },
+          "img_size": {
+            "type": "integer"
+          },
+          "initial_model": {
+            "type": "string",
+            "format": "string"
           }
         }
       },
@@ -466,10 +502,6 @@
             "type": "integer",
             "description": "Batch size for training"
           },
-          "img_size": {
-            "type": "integer",
-            "description": "Image size for training"
-          },
           "confidence_threshold": {
             "type": "number",
             "description": "Confidence threshold for skipping images"
@@ -489,6 +521,39 @@
           "min_iou_threshold": {
             "type": "number",
             "description": "Minimum intersection over union threshold for detection"
+          }
+        }
+      },
+      "get_project_settings": {
+        "type": "object",
+        "properties": {
+          "max_class_nr": {
+            "type": "integer"
+          },
+          "epochs": {
+            "type": "integer"
+          },
+          "batch_size": {
+            "type": "integer"
+          },
+          "initial_model": {
+            "type": "string",
+            "format": "string"
+          },
+          "confidence_threshold": {
+            "type": "integer"
+          },
+          "train_test_ratio": {
+            "type": "integer"
+          },
+          "minimal_map_50_threshold": {
+            "type": "integer"
+          },
+          "min_confidence_threshold": {
+            "type": "integer"
+          },
+          "min_iou_threshold": {
+            "type": "integer"
           }
         }
       },

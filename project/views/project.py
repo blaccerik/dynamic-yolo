@@ -14,7 +14,7 @@ from project.services.file_upload_service import upload_files
 from project.models.annotation import Annotation
 from project.models.image import Image
 from project.services.project_service import create_project, get_models, get_all_projects, get_project_info, \
-    change_settings, get_model
+    change_settings, get_model, get_settings
 from project.schemas.project import Project
 from project.schemas.upload import Upload
 from project.schemas.model import Model
@@ -119,7 +119,9 @@ def create_record():
     data = Project().load(request.json)
     name = data["name"]
     max_class_nr = data["max_class_nr"]
-    code = create_project(name, max_class_nr)
+    init_model = data["initial_model"]
+    img_size = data["img_size"]
+    code = create_project(name, max_class_nr, init_model, img_size)
     if code == -1:
         return jsonify({'error': 'Project with that name already exists'}), 409
 
@@ -154,15 +156,15 @@ def change_project_settings(project_id):
     if errors:
         return jsonify({'error': f'Please check the following fields: {errors}'}), 400
 
-    error_code = change_settings(project_id, data)
-
-    if error_code == 1:
-        return jsonify({'error': f'Project with the id of {project_id} does not exist!'}), 404
-    if error_code == 2:
-        return jsonify({'error': f'Project with the id of {project_id} does not have a settings file!'}), 404
+    change_settings(project_id, data)
 
     return jsonify({'message': f'Successfully updated these settings: {data}'}), 201
 
+
+@REQUEST_API.route('/<int:project_id>/settings', methods=['GET'])
+def get_project_settings(project_id):
+    settings = get_settings(project_id)
+    return jsonify(settings), 201
 
 @REQUEST_API.route('/<int:project_id>/models', methods=['GET'])
 def get_project_models(project_id):
