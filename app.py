@@ -15,14 +15,6 @@ def send_static(path):
     return send_from_directory("static", path)
 
 
-@app.errorhandler(ValidationError)
-def handle_validation_error(error):
-    """
-    Return serialization error
-    """
-    return make_response(jsonify(error.messages), 400)
-
-
 ### swagger specific ###
 SWAGGER_URL = '/swagger'
 API_URL = '/static/swagger.json'

@@ -60,7 +60,11 @@ def get_project_info(project_code: int):
 
     total_models_in_project = len(project.models)
 
-    total_epochs = Model.query.get(project.latest_model_id).total_epochs
+    m = Model.query.get(project.latest_model_id)
+    if m is None:
+        total_epochs = 0
+    else:
+        total_epochs = m.total_epochs
 
     project_info = {
         'name': project.name,
