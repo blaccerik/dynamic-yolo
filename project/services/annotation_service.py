@@ -53,9 +53,7 @@ def retrieve_annotation(annotation_code):
 
 def change_annotation_values(annotation_code, data):
     annotation = Annotation.query.get(annotation_code)
-    print(annotation)
     if annotation is None:
-        print('not foundndnd')
         raise ValidationError({"error": f"Annotation not found"})
     for k, v in data.items():
         setattr(annotation, k, v)
