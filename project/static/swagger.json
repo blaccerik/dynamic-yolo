@@ -437,6 +437,68 @@
         }
       }
     },
+    "/models": {
+      "get": {
+        "tags": [
+          "Models Requests"
+        ],
+        "summary": "Get all models",
+        "responses": {
+          "200": {
+            "description": "List of models",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/simple_model_info"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/models/{model_id}/download": {
+      "get": {
+        "tags": [
+          "Models Requests"
+        ],
+        "summary": "Download a trained model file",
+        "description": "Returns a trained model file for download",
+        "parameters": [
+          {
+            "name": "model_id",
+            "in": "path",
+            "description": "ID of the model to download",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Model not found!"
+          },
+          "404-wrong-binary": {
+            "description": "Incorrect binary data!"
+          }
+        }
+      }
+    },
     "/annotations": {
       "get": {
         "tags": [
