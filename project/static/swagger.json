@@ -253,7 +253,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/Image"
+                    "$ref": "#/components/schemas/image"
                   }
                 }
               }
@@ -726,20 +726,12 @@
           }
         }
       },
-      "Image": {
+      "image": {
         "type": "object",
         "properties": {
           "id": {
             "type": "integer",
             "format": "int64"
-          },
-          "height": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "width": {
-            "type": "integer",
-            "format": "int32"
           },
           "annotations": {
             "type": "array",
@@ -759,15 +751,7 @@
             "type": "string",
             "format": "string"
           }
-        },
-        "required": [
-          "id",
-          "image",
-          "height",
-          "width",
-          "project_id",
-          "subset_id"
-        ]
+        }
       },
       "model_info": {
         "type": "object",
