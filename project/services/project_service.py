@@ -79,6 +79,36 @@ def get_project_info(project_code: int):
     return project_info
 
 
+def get_images(project_code: int, page_size: int, page_nr: int):
+    project = Project.query.get(project_code)
+    if project is None:
+        raise ValidationError({"error": f"Project not found"})
+    data = []
+    # get image data
+    ss_test = Subset.query.filter(Subset.name.like("test")).first()
+    ss_train = Subset.query.filter(Subset.name.like("train")).first()
+    for i in Image.query.filter(Image.project_id == project_code).paginate(page=page_nr, per_page=page_size,
+                                                                           error_out=False):
+        model_ids = [x.id for x in i.models]
+        annotation_ids = [x.id for x in i.annotations]
+        if i.subset_id == ss_test.id:
+            name = "test"
+        elif i.subset_id == ss_train.id:
+            name = "test"
+        else:
+            raise ValidationError({"error": f"Unknown id {i.subset_id}"})
+        image_data = {
+            "id": i.id,
+            "height": i.height,
+            "width": i.width,
+            "annotations": annotation_ids,
+            "models": model_ids,
+            "subset_name": name
+        }
+        data.append(image_data)
+    return data
+
+
 def change_settings(project_code: int, new_settings: dict):
     # TODO add exceptions to get rid of this returning numbers situation
     # TODO maybe add a check in schema to filter these settings so that

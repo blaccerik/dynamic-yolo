@@ -234,6 +234,15 @@
               "maximum": 100,
               "default": 20
             }
+          },
+          {
+            "name": "page_nr",
+            "in": "query",
+            "description": "Page number",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
           }
         ],
         "responses": {
@@ -574,10 +583,6 @@
             "type": "integer",
             "format": "int64"
           },
-          "image": {
-            "type": "string",
-            "format": "binary"
-          },
           "height": {
             "type": "integer",
             "format": "int32"
@@ -585,10 +590,6 @@
           "width": {
             "type": "integer",
             "format": "int32"
-          },
-          "project_id": {
-            "type": "integer",
-            "format": "int64"
           },
           "annotations": {
             "type": "array",
@@ -604,9 +605,9 @@
               "description": "ID-s of models"
             }
           },
-          "subset_id": {
-            "type": "integer",
-            "format": "int32"
+          "subset_name": {
+            "type": "string",
+            "format": "string"
           }
         },
         "required": [

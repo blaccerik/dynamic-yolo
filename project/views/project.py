@@ -11,10 +11,11 @@ from project.services.file_upload_service import upload_files
 from project.models.annotation import Annotation
 from project.models.image import Image
 from project.services.project_service import create_project, get_all_projects, get_project_info, \
-    change_settings, get_settings
+    change_settings, get_settings, get_images
 from project.schemas.project import Project
 from project.schemas.upload import Upload
 from project.schemas.projectsettings import ProjectSettingsSchema
+from project.shared.query_validators import validate_page_size, validate_page_nr
 
 REQUEST_API = Blueprint('project', __name__, url_prefix="/projects")
 
@@ -137,9 +138,6 @@ def get_projects():
 def get_info(project_id):
     project_info = get_project_info(project_id)
 
-    if project_info is None:
-        return jsonify({'error': 'Project with that id does not exist'}), 404
-
     return jsonify(project_info)
 
 
@@ -160,6 +158,17 @@ def change_project_settings(project_id):
 def get_project_settings(project_id):
     settings = get_settings(project_id)
     return jsonify(settings), 201
+
+
+@REQUEST_API.route('/<int:project_id>/images', methods=['GET'])
+def get_project_images(project_id):
+    page_size = request.args.get("page_size")
+    page_size = validate_page_size(page_size, 20, 100)
+    page_nr = request.args.get("page_nr")
+    page_nr = validate_page_nr(page_nr)
+
+    images = get_images(project_id, page_size, page_nr)
+    return jsonify(images), 200
 
 
 @REQUEST_API.route('/<int:project_id>/upload', methods=["POST"])
