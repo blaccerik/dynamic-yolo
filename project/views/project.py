@@ -168,7 +168,7 @@ def get_project_images(project_id):
     page_nr = validate_page_nr(page_nr)
 
     images = get_images(project_id, page_size, page_nr)
-    return jsonify(images), 201
+    return jsonify(images), 200
 
 
 @REQUEST_API.route('/<int:project_id>/upload', methods=["POST"])
