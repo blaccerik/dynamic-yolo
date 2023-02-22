@@ -61,7 +61,7 @@ def register_blueprints(app):
     from project.views import project
     from project.views import queue
     from project.views import image
-
+    from project.views import model
     from project.views import annotation
 
     from project.exceptions import project_not_found
