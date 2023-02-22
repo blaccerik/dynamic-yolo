@@ -15,7 +15,7 @@ class Model(db.Model):
     project_id = Column(BigInteger, ForeignKey("project.id", name="fk_project"), nullable=False)
     model = Column(LargeBinary, nullable=True)
 
-    model_results_id = relationship("ModelResults", backref="model")
+    model_results = relationship("ModelResults", backref="model")
     parent = relationship('Model', remote_side=[id])
 
     images = relationship("Image", secondary="model_image", back_populates="models")
