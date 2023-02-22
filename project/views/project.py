@@ -1,24 +1,21 @@
 import io
-import zipfile
 import tarfile
 from io import BytesIO
 
 import PIL
-import torch
-from flask import Blueprint, request, jsonify, send_file
+from flask import Blueprint, request, jsonify
 from marshmallow import ValidationError
 from werkzeug.utils import secure_filename
 
-from project.schemas.zip_upload import ZipUpload
 from project.services.file_upload_service import upload_files
 from project.models.annotation import Annotation
 from project.models.image import Image
-from project.services.project_service import create_project, get_models, get_all_projects, get_project_info, \
-    change_settings, get_model, get_settings
+from project.services.project_service import create_project, get_all_projects, get_project_info, \
+    change_settings, get_settings, get_images
 from project.schemas.project import Project
 from project.schemas.upload import Upload
-from project.schemas.model import Model
 from project.schemas.projectsettings import ProjectSettingsSchema
+from project.shared.query_validators import validate_page_size, validate_page_nr
 
 REQUEST_API = Blueprint('project', __name__, url_prefix="/projects")
 
@@ -50,18 +47,18 @@ def _text_to_annotations(content, filename):
             h = float(h)
             # check ranges
             if nr < 0:
-                raise ValidationError({"error":  f"File: {name}.txt did not yolo format"})
+                raise ValidationError({"error": f"File: {name}.txt did not yolo format"})
             if x > 1 or x < 0:
-                raise ValidationError({"error":  f"File: {name}.txt did not yolo format"})
+                raise ValidationError({"error": f"File: {name}.txt did not yolo format"})
             if y > 1 or y < 0:
-                raise ValidationError({"error":  f"File: {name}.txt did not yolo format"})
+                raise ValidationError({"error": f"File: {name}.txt did not yolo format"})
             if w > 1 or w < 0:
-                raise ValidationError({"error":  f"File: {name}.txt did not yolo format"})
+                raise ValidationError({"error": f"File: {name}.txt did not yolo format"})
             if h > 1 or h < 0:
-                raise ValidationError({"error":  f"File: {name}.txt did not yolo format"})
+                raise ValidationError({"error": f"File: {name}.txt did not yolo format"})
             _list.append((Annotation(x_center=x, y_center=y, width=w, height=h, class_id=nr), name))
         except Exception as e:
-            raise ValidationError({"error":  f"Can't read file: {name}.txt"})
+            raise ValidationError({"error": f"Can't read file: {name}.txt"})
             # return jsonify({'error': f"Can't read file: {name}.txt"}), 400
     return _list
 
@@ -113,7 +110,6 @@ def _check_zip_file(content):
     return files
 
 
-
 @REQUEST_API.route('/', methods=['POST'])
 def create_record():
     data = Project().load(request.json)
@@ -142,9 +138,6 @@ def get_projects():
 def get_info(project_id):
     project_info = get_project_info(project_id)
 
-    if project_info is None:
-        return jsonify({'error': 'Project with that id does not exist'}), 404
-
     return jsonify(project_info)
 
 
@@ -166,32 +159,16 @@ def get_project_settings(project_id):
     settings = get_settings(project_id)
     return jsonify(settings), 201
 
-@REQUEST_API.route('/<int:project_id>/models', methods=['GET'])
-def get_project_models(project_id):
-    project_models = get_models(project_id)
 
-    if project_models is None:
-        return jsonify({'error': 'Project with that id does not exist'}), 404
+@REQUEST_API.route('/<int:project_id>/images', methods=['GET'])
+def get_project_images(project_id):
+    page_size = request.args.get("page_size")
+    page_size = validate_page_size(page_size, 20, 100)
+    page_nr = request.args.get("page_nr")
+    page_nr = validate_page_nr(page_nr)
 
-    model_schema = Model(many=True)
-    serialized_models = model_schema.dump(project_models)
-
-    return serialized_models
-
-
-@REQUEST_API.route('/<int:project_id>/models/<int:model_id>/download', methods=['GET'])
-def download_model(project_id, model_id):
-    model = get_model(project_id, model_id)
-    if not model:
-        return jsonify({'error': 'Model with the following project_id was not found!'}), 404
-
-    binary_data = model.model
-    pt_data = torch.load(io.BytesIO(binary_data))
-    pt_file = io.BytesIO()
-    torch.save(pt_data, pt_file)
-    pt_file.seek(0)
-    return send_file(pt_file, mimetype='application/octet-stream', as_attachment=True,
-                     download_name=f'model_{model_id}.pt')
+    images = get_images(project_id, page_size, page_nr)
+    return jsonify(images), 200
 
 
 @REQUEST_API.route('/<int:project_id>/upload', methods=["POST"])
@@ -220,4 +197,3 @@ def upload(project_id: int):
     passed, failed, annotations = upload_files(uploaded_files, project_id, uploader, split)
     return jsonify(
         {'message': f'Uploaded {passed} images and {annotations} annotations. There were {failed} failed images'}), 201
-

@@ -206,85 +206,6 @@
         }
       }
     },
-    "/projects/{project_id}/models": {
-      "get": {
-        "tags": [
-          "Project Requests"
-        ],
-        "summary": "Get all models for a project",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "project_id",
-            "description": "ID of the project",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/project_id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "List of models for the project",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/simple_model_info"
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Project not found"
-          }
-        }
-      }
-    },
-    "/projects/{project_id}/models/{model_id}/download": {
-      "get": {
-        "tags": [
-          "Project Requests"
-        ],
-        "summary": "Download a trained model file",
-        "description": "Returns a trained model file for download",
-        "parameters": [
-          {
-            "name": "project_id",
-            "in": "path",
-            "description": "ID of the project that the model belongs to",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            }
-          },
-          {
-            "name": "model_id",
-            "in": "path",
-            "description": "ID of the model to download",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/octet-stream": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/projects/{project_id}/images": {
       "get": {
         "tags": [
@@ -312,6 +233,15 @@
               "minimum": 1,
               "maximum": 100,
               "default": 20
+            }
+          },
+          {
+            "name": "page_nr",
+            "in": "query",
+            "description": "Page number",
+            "required": false,
+            "schema": {
+              "type": "integer"
             }
           }
         ],
@@ -736,6 +666,11 @@
             "type": "string",
             "format": "date-time",
             "description": "Date and time the model was added"
+          },
+          "project_id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "ID of the project model is associated with"
           }
         }
       },
@@ -770,10 +705,6 @@
             "type": "integer",
             "format": "int64"
           },
-          "image": {
-            "type": "string",
-            "format": "binary"
-          },
           "height": {
             "type": "integer",
             "format": "int32"
@@ -781,10 +712,6 @@
           "width": {
             "type": "integer",
             "format": "int32"
-          },
-          "project_id": {
-            "type": "integer",
-            "format": "int64"
           },
           "annotations": {
             "type": "array",
@@ -800,9 +727,9 @@
               "description": "ID-s of models"
             }
           },
-          "subset_id": {
-            "type": "integer",
-            "format": "int32"
+          "subset_name": {
+            "type": "string",
+            "format": "string"
           }
         },
         "required": [

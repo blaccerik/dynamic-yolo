@@ -1,6 +1,7 @@
 from marshmallow import ValidationError
 
 from project import db
+from project.exceptions.user_not_authorized import UserNotAuthorized
 from project.models.annotation import Annotation
 from project.models.annotator import Annotator
 from project.models.image import Image
@@ -81,6 +82,11 @@ def upload_files(files: list, project_code: int, uploader: str, split: str) -> (
     unknown_project = Project.query.filter_by(name="unknown").first()
     if project is None:
         raise ValidationError({"error":  f"Project not found"})
+
+    # users cant upload to "unknown" project
+    if project_code == unknown_project.id:
+        raise UserNotAuthorized("Can't upload to 'unknown' project")
+
 
     if split not in ["test", "train", "random"]:
         raise ValidationError({"error": f"Unknown split {split}"})
