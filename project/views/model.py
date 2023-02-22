@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify, send_file
-from project.services.model_service import get_models, get_model
+from project.services.model_service import get_models, get_model, model_info
 
 import io
 import torch
@@ -14,15 +14,16 @@ def get_all_models():
     return models
 
 
+@REQUEST_API.route('/<int:model_id>', methods=['GET'])
+def get_model_info(model_id):
+    data = model_info(model_id)
+    return jsonify(data), 200
+
+
 @REQUEST_API.route('/<int:model_id>/download', methods=['GET'])
 def download_model(model_id):
     model = get_model(model_id)
-    if not model:
-        return jsonify({'error': 'Model was not found in the database!'}), 404
     binary_data = model.model
-    if not binary_data:
-        return jsonify({'error': 'Incorrect binary data of model!'}), 404
-
     pt_data = torch.load(io.BytesIO(binary_data))
     pt_file = io.BytesIO()
     torch.save(pt_data, pt_file)

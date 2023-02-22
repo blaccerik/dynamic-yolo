@@ -390,6 +390,37 @@
         }
       }
     },
+    "/models/{model_id}": {
+      "get": {
+        "tags": [
+          "Models Requests"
+        ],
+        "summary": "Get model info",
+        "parameters": [
+          {
+            "name": "model_id",
+            "in": "path",
+            "description": "Model id",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/model_id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Model info",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/model_info"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/models/{model_id}/download": {
       "get": {
         "tags": [
@@ -422,9 +453,6 @@
           },
           "404": {
             "description": "Model not found!"
-          },
-          "404-wrong-binary": {
-            "description": "Incorrect binary data!"
           }
         }
       }
@@ -619,13 +647,9 @@
           "subset_id"
         ]
       },
-      "Model": {
+      "model_info": {
         "type": "object",
         "properties": {
-          "id": {
-            "type": "integer",
-            "format": "int64"
-          },
           "parent_model_id": {
             "type": "integer",
             "format": "int64"
