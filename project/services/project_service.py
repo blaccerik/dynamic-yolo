@@ -94,13 +94,11 @@ def get_images(project_code: int, page_size: int, page_nr: int):
         if i.subset_id == ss_test.id:
             name = "test"
         elif i.subset_id == ss_train.id:
-            name = "test"
+            name = "train"
         else:
             raise ValidationError({"error": f"Unknown id {i.subset_id}"})
         image_data = {
             "id": i.id,
-            "height": i.height,
-            "width": i.width,
             "annotations": annotation_ids,
             "models": model_ids,
             "subset_name": name
