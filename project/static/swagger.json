@@ -459,6 +459,84 @@
           }
         }
       }
+    },
+    "/annotations/{annotation_id}": {
+      "put": {
+        "tags": [
+          "Annotations Requests"
+        ],
+        "summary": "Update an annotation by ID.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "annotation_id",
+            "description": "ID of the annotation",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/annotation_id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/change_annotation"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The updated annotation object.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/change_annotation"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request body."
+          },
+          "404": {
+            "description": "Annotation not found"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Annotations Requests"
+        ],
+        "summary": "Get annotation info",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "annotation_id",
+            "description": "ID of the annotation",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/annotation_id"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/annotation_info"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Annotation not found."
+          }
+        }
+      }
     }
   },
   "components": {
@@ -818,7 +896,96 @@
           "position",
           "project_id"
         ]
+      },
+      "annotation_info": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "confidence": {
+            "type": "number",
+            "format": "float"
+          },
+          "x_center": {
+            "type": "number",
+            "format": "float"
+          },
+          "y_center": {
+            "type": "number",
+            "format": "float"
+          },
+          "width": {
+            "type": "number",
+            "format": "float"
+          },
+          "height": {
+            "type": "number",
+            "format": "float"
+          },
+          "class_id": {
+            "type": "integer"
+          },
+          "project_id": {
+            "type": "integer"
+          },
+          "image_id": {
+            "type": "integer"
+          },
+          "annotator_name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "x_center",
+          "y_center",
+          "width",
+          "height",
+          "class_id",
+          "project_id",
+          "annotator_id"
+        ]
+      },
+      "change_annotation": {
+        "type": "object",
+        "properties": {
+          "x_center": {
+            "type": "number",
+            "format": "float"
+          },
+          "y_center": {
+            "type": "number",
+            "format": "float"
+          },
+          "width": {
+            "type": "number",
+            "format": "float"
+          },
+          "height": {
+            "type": "number",
+            "format": "float"
+          },
+          "class_id": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "x_center",
+          "y_center",
+          "width",
+          "height",
+          "class_id",
+          "project_id",
+          "annotator_id"
+        ]
+      },
+      "annotation_id": {
+        "type": "integer"
       }
     }
   }
 }
+
+
