@@ -205,6 +205,9 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     assert mlc < nc, f'Label class {mlc} exceeds nc={nc} in {data}. Possible class labels are 0-{nc - 1}'
 
     # Process 0
+    # todo check has created dataloader
+    #  if not raise error or something and requeue the project
+    #  most likely caused by to many requests
     if RANK in {-1, 0}:
         val_loader = create_dataloader(val_path,
                                        imgsz,
