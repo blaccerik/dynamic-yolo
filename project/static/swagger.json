@@ -206,85 +206,6 @@
         }
       }
     },
-    "/projects/{project_id}/models": {
-      "get": {
-        "tags": [
-          "Project Requests"
-        ],
-        "summary": "Get all models for a project",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "project_id",
-            "description": "ID of the project",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/project_id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "List of models for the project",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/simple_model_info"
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Project not found"
-          }
-        }
-      }
-    },
-    "/projects/{project_id}/models/{model_id}/download": {
-      "get": {
-        "tags": [
-          "Project Requests"
-        ],
-        "summary": "Download a trained model file",
-        "description": "Returns a trained model file for download",
-        "parameters": [
-          {
-            "name": "project_id",
-            "in": "path",
-            "description": "ID of the project that the model belongs to",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            }
-          },
-          {
-            "name": "model_id",
-            "in": "path",
-            "description": "ID of the model to download",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/octet-stream": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/projects/{project_id}/images": {
       "get": {
         "tags": [
@@ -436,6 +357,68 @@
           }
         }
       }
+    },
+    "/models": {
+      "get": {
+        "tags": [
+          "Models Requests"
+        ],
+        "summary": "Get all models",
+        "responses": {
+          "200": {
+            "description": "List of models",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/simple_model_info"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/models/{model_id}/download": {
+      "get": {
+        "tags": [
+          "Models Requests"
+        ],
+        "summary": "Download a trained model file",
+        "description": "Returns a trained model file for download",
+        "parameters": [
+          {
+            "name": "model_id",
+            "in": "path",
+            "description": "ID of the model to download",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Model not found!"
+          },
+          "404-wrong-binary": {
+            "description": "Incorrect binary data!"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -573,6 +556,11 @@
             "type": "string",
             "format": "date-time",
             "description": "Date and time the model was added"
+          },
+          "project_id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "ID of the project model is associated with"
           }
         }
       },
