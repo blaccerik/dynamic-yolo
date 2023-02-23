@@ -1,0 +1,44 @@
+version: '3.7'
+services:
+  postgres:
+    container_name: yolo_postgres
+    networks:
+      - yolo
+    image: postgres:13.2-alpine
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: $DB_NAME
+      POSTGRES_USER: $DB_USERNAME
+      POSTGRES_PASSWORD: $DB_PASSWORD
+    volumes:
+      - postgres:/var/lib/postgresql/data
+  pgadmin:
+    networks:
+      - yolo
+    image: chorss/docker-pgadmin4
+    container_name: yolo_pgadmin4
+    depends_on:
+      - postgres
+    ports:
+      - "5050:5050"
+  flask:
+    # remove tty to not keep it alive
+    tty: true
+    networks:
+      - yolo
+    depends_on:
+      - postgres
+    ports:
+      - "5000:5000"
+    build:
+      context:
+        docker/.
+    container_name: yolo_flask
+
+networks:
+  yolo:
+
+volumes:
+  postgres:
