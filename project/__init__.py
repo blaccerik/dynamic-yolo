@@ -57,18 +57,31 @@ def register_blueprints(app):
     from project.views import home
     from project.views import upload
     from project.views import upload_classes
-    from project.exceptions import project_not_found
     from project.views import users
     from project.views import project
+    from project.views import queue
+    from project.views import image
+    from project.views import model
+    from project.views import annotation
+
+    from project.exceptions import project_not_found
+    from project.exceptions import user_not_authorized
+    from project.exceptions import validation_error
 
     app.register_blueprint(upload_classes.mod)
     app.register_blueprint(home.mod)
     app.register_blueprint(upload.REQUEST_API)
     app.register_blueprint(users.REQUEST_API)
     app.register_blueprint(project.REQUEST_API)
+    app.register_blueprint(queue.REQUEST_API)
+    app.register_blueprint(image.REQUEST_API)
+    app.register_blueprint(model.REQUEST_API)
+
+    app.register_blueprint(annotation.REQUEST_API)
 
     app.register_blueprint(project_not_found.project_not_found_error)
-
+    app.register_blueprint(user_not_authorized.user_not_authorized_error)
+    app.register_blueprint(validation_error.validation_error)
 
 def register_cli_commands(app):
     @app.cli.command('init_db')

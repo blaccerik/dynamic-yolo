@@ -1,4 +1,7 @@
+from marshmallow import ValidationError
+
 from project import db
+from project.exceptions.user_not_authorized import UserNotAuthorized
 from project.models.annotation import Annotation
 from project.models.annotator import Annotator
 from project.models.image import Image
@@ -73,16 +76,35 @@ def upload_files(files: list, project_code: int, uploader: str, split: str) -> (
 
     annotator = Annotator.query.filter_by(name=uploader).first()
     if annotator is None:
-        raise Exception("ano")
+        raise ValidationError({"error":  f"User not found"})
 
     project = Project.query.get(project_code)
     unknown_project = Project.query.filter_by(name="unknown").first()
     if project is None:
-        raise Exception("project")
+        raise ValidationError({"error":  f"Project not found"})
+
+    # users cant upload to "unknown" project
+    if project_code == unknown_project.id:
+        raise UserNotAuthorized("Can't upload to 'unknown' project")
+
 
     if split not in ["test", "train", "random"]:
-        raise Exception(f"unknown split {split}")
+        raise ValidationError({"error": f"Unknown split {split}"})
     ps = ProjectSettings.query.get(project.id)
+
+    max_class_nr = ps.max_class_nr
+    # check if all annotations are in range
+    # check that all images have unique name
+    seen = set()
+    for f, name in files:
+        if type(f) is Image:
+            if name in seen:
+                raise ValidationError({'error': f'Duplicate images found: {name}'})
+            seen.add(name)
+        elif type(f) is Annotation:
+            if f.class_id >= max_class_nr:
+                raise ValidationError({'error': f'Class id out of range: {name}'})
+
     ratio = ps.train_test_ratio
 
     # find all annotations
