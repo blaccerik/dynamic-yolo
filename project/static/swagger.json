@@ -1,0 +1,1010 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "description": "dynamic yolo",
+    "version": "1.0.0",
+    "title": "Dynamic yolo",
+    "license": {
+      "name": "MIT",
+      "url": "https://opensource.org/licenses/MIT"
+    }
+  },
+  "paths": {
+    "/users": {
+      "post": {
+        "tags": [
+          "User Requests"
+        ],
+        "summary": "Create a new user",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/user"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created new user"
+          },
+          "409": {
+            "description": "User has been created"
+          }
+        }
+      }
+    },
+    "/projects": {
+      "post": {
+        "tags": [
+          "Project Requests"
+        ],
+        "summary": "Create a new project",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/project"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created new user"
+          },
+          "409": {
+            "description": "User has been created"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Project Requests"
+        ],
+        "summary": "Get all projects",
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/projects/{project_id}/upload": {
+      "post": {
+        "tags": [
+          "Project Requests"
+        ],
+        "summary": "Upload files to project",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "description": "Project id",
+            "schema": {
+              "$ref": "#/components/schemas/project_id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/upload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/projects/{project_id}": {
+      "get": {
+        "tags": [
+          "Project Requests"
+        ],
+        "summary": "Get project info by id",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "description": "Project id",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/project_id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Project details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/project"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{project_id}/settings": {
+      "put": {
+        "tags": [
+          "Project Requests"
+        ],
+        "summary": "Change project settings",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "description": "ID of the project",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/project_id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/project_settings"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Project settings updated"
+          },
+          "400": {
+            "description": "Invalid project ID or settings"
+          },
+          "404": {
+            "description": "Project not found"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Project Requests"
+        ],
+        "summary": "Get project settings",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "description": "ID of the project",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/project_id"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/get_project_settings"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{project_id}/images": {
+      "get": {
+        "tags": [
+          "Project Requests"
+        ],
+        "summary": "Get images for a project",
+        "description": "Get a paginated list of images for a project",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "description": "ID of the project to get images for",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "Number of images to be returned per page",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "page_nr",
+            "in": "query",
+            "description": "Page number",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A list of images for the project",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/image"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/queue": {
+      "get": {
+        "tags": [
+          "Queue Requests"
+        ],
+        "summary": "Get the queue",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Queue"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No queues currently available"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Queue Requests"
+        ],
+        "summary": "Add a new project to the queue",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "project_id": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "project_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Added a project to the queue",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Queue"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project not found"
+          }
+        }
+      }
+    },
+    "/images/{image_id}": {
+      "get": {
+        "tags": [
+          "Images Requests"
+        ],
+        "summary": "Get image by ID",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "image_id",
+            "description": "ID of the image to retrieve",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Image not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/projects/{project_id}/models": {
+      "get": {
+        "tags": [
+          "Project Requests"
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "description": "ID of the project to get models for",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "summary": "Get all models in a project",
+        "responses": {
+          "200": {
+            "description": "List of models",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/simple_model_info"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/models/{model_id}": {
+      "get": {
+        "tags": [
+          "Models Requests"
+        ],
+        "summary": "Get model info",
+        "parameters": [
+          {
+            "name": "model_id",
+            "in": "path",
+            "description": "Model id",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/model_id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Model info",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/model_info"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/models/{model_id}/download": {
+      "get": {
+        "tags": [
+          "Models Requests"
+        ],
+        "summary": "Download a trained model file",
+        "description": "Returns a trained model file for download",
+        "parameters": [
+          {
+            "name": "model_id",
+            "in": "path",
+            "description": "ID of the model to download",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Model not found!"
+          }
+        }
+      }
+    },
+    "/projects/{project_id}/annotations": {
+      "get": {
+        "tags": [
+          "Project Requests"
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "description": "ID of the project to get annotations for",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "summary": "Get all annotations of a project",
+        "responses": {
+          "200": {
+            "description": "List of annotations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/simple_annotation_info"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/annotations/{annotation_id}": {
+      "put": {
+        "tags": [
+          "Annotations Requests"
+        ],
+        "summary": "Update an annotation by ID.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "annotation_id",
+            "description": "ID of the annotation",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/annotation_id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/change_annotation"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The updated annotation object.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/change_annotation"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request body."
+          },
+          "404": {
+            "description": "Annotation not found"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Annotations Requests"
+        ],
+        "summary": "Get annotation info",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "annotation_id",
+            "description": "ID of the annotation",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/annotation_id"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/annotation_info"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Annotation not found."
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "project_id": {
+        "type": "integer"
+      },
+      "user": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "format": "string"
+          }
+        }
+      },
+      "project": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "format": "string"
+          },
+          "max_class_nr": {
+            "type": "integer"
+          },
+          "img_size": {
+            "type": "integer"
+          },
+          "initial_model": {
+            "type": "string",
+            "format": "string"
+          }
+        }
+      },
+      "upload": {
+        "type": "object",
+        "properties": {
+          "uploader_name": {
+            "type": "string",
+            "format": "string"
+          },
+          "split": {
+            "type": "string",
+            "format": "string"
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "binary"
+            }
+          }
+        }
+      },
+      "project_settings": {
+        "type": "object",
+        "properties": {
+          "epochs": {
+            "type": "integer",
+            "description": "Number of training epochs"
+          },
+          "batch_size": {
+            "type": "integer",
+            "description": "Batch size for training"
+          },
+          "confidence_threshold": {
+            "type": "number",
+            "description": "Confidence threshold for skipping images"
+          },
+          "train_test_ratio": {
+            "type": "number",
+            "description": "Training and testing data split ratio"
+          },
+          "minimal_map_50_threshold": {
+            "type": "number",
+            "description": "Minimal map threshold"
+          },
+          "min_confidence_threshold": {
+            "type": "number",
+            "description": "Minimum confidence threshold for detection"
+          },
+          "min_iou_threshold": {
+            "type": "number",
+            "description": "Minimum intersection over union threshold for detection"
+          }
+        }
+      },
+      "get_project_settings": {
+        "type": "object",
+        "properties": {
+          "max_class_nr": {
+            "type": "integer"
+          },
+          "epochs": {
+            "type": "integer"
+          },
+          "batch_size": {
+            "type": "integer"
+          },
+          "initial_model": {
+            "type": "string",
+            "format": "string"
+          },
+          "confidence_threshold": {
+            "type": "integer"
+          },
+          "train_test_ratio": {
+            "type": "integer"
+          },
+          "minimal_map_50_threshold": {
+            "type": "integer"
+          },
+          "min_confidence_threshold": {
+            "type": "integer"
+          },
+          "min_iou_threshold": {
+            "type": "integer"
+          }
+        }
+      },
+      "simple_model_info": {
+        "type": "object",
+        "properties": {
+          "model_status_name": {
+            "type": "string",
+            "description": "Status of the model"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "ID of the model"
+          },
+          "added": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Date and time the model was added"
+          },
+          "project_id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "ID of the project model is associated with"
+          }
+        }
+      },
+      "model_id": {
+        "type": "integer"
+      },
+      "simple_annotation_info": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "ID of the annotation"
+          },
+          "project_id": {
+            "type": "integer",
+            "description": "ID of the project"
+          },
+          "annotator_name": {
+            "type": "string",
+            "description": "Annotator of the annotation"
+          },
+          "image_id": {
+            "type": "integer",
+            "description": "ID of the image"
+          }
+        }
+      },
+      "image": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "annotations": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "description": "ID-s of annotations"
+            }
+          },
+          "models": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "description": "ID-s of models"
+            }
+          },
+          "subset_name": {
+            "type": "string",
+            "format": "string"
+          }
+        }
+      },
+      "model_info": {
+        "type": "object",
+        "properties": {
+          "parent_model_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "added": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "total_epochs": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "epochs": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "model_status_name": {
+            "type": "string"
+          },
+          "project_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "model_results": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "description": "ID-s of results"
+            }
+          },
+          "images": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "description": "ID-s of images"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "added",
+          "total_epochs",
+          "epochs",
+          "model_status_id",
+          "project_id"
+        ]
+      },
+      "ModelImage": {
+        "type": "object",
+        "properties": {
+          "model_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "image_id": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "required": [
+          "model_id",
+          "image_id"
+        ]
+      },
+      "ModelResults": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "model_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "subset_id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "epoch": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "metric_precision": {
+            "type": "number",
+            "format": "float"
+          },
+          "metric_recall": {
+            "type": "number",
+            "format": "float"
+          },
+          "metric_map_50": {
+            "type": "number",
+            "format": "float"
+          },
+          "metric_map_50_95": {
+            "type": "number",
+            "format": "float"
+          },
+          "val_box_loss": {
+            "type": "number",
+            "format": "float"
+          },
+          "val_obj_loss": {
+            "type": "number",
+            "format": "float"
+          },
+          "val_cls_loss": {
+            "type": "number",
+            "format": "float"
+          }
+        },
+        "required": [
+          "id",
+          "model_id",
+          "subset_id",
+          "metric_precision",
+          "metric_recall",
+          "metric_map_50",
+          "metric_map_50_95",
+          "val_box"
+        ]
+      },
+      "Queue": {
+        "type": "object",
+        "properties": {
+          "position": {
+            "type": "integer"
+          },
+          "project_id": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "position",
+          "project_id"
+        ]
+      },
+      "annotation_info": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "confidence": {
+            "type": "number",
+            "format": "float"
+          },
+          "x_center": {
+            "type": "number",
+            "format": "float"
+          },
+          "y_center": {
+            "type": "number",
+            "format": "float"
+          },
+          "width": {
+            "type": "number",
+            "format": "float"
+          },
+          "height": {
+            "type": "number",
+            "format": "float"
+          },
+          "class_id": {
+            "type": "integer"
+          },
+          "project_id": {
+            "type": "integer"
+          },
+          "image_id": {
+            "type": "integer"
+          },
+          "annotator_name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "x_center",
+          "y_center",
+          "width",
+          "height",
+          "class_id",
+          "project_id",
+          "annotator_id"
+        ]
+      },
+      "change_annotation": {
+        "type": "object",
+        "properties": {
+          "x_center": {
+            "type": "number",
+            "format": "float"
+          },
+          "y_center": {
+            "type": "number",
+            "format": "float"
+          },
+          "width": {
+            "type": "number",
+            "format": "float"
+          },
+          "height": {
+            "type": "number",
+            "format": "float"
+          },
+          "class_id": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "x_center",
+          "y_center",
+          "width",
+          "height",
+          "class_id",
+          "project_id",
+          "annotator_id"
+        ]
+      },
+      "annotation_id": {
+        "type": "integer"
+      }
+    }
+  }
+}
+
+
