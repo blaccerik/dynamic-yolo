@@ -91,6 +91,20 @@ def upload_files(files: list, project_code: int, uploader: str, split: str) -> (
     if split not in ["test", "train", "random"]:
         raise ValidationError({"error": f"Unknown split {split}"})
     ps = ProjectSettings.query.get(project.id)
+
+    max_class_nr = ps.max_class_nr
+    # check if all annotations are in range
+    # check that all images have unique name
+    seen = set()
+    for f, name in files:
+        if type(f) is Image:
+            if name in seen:
+                raise ValidationError({'error': f'Duplicate images found: {name}'})
+            seen.add(name)
+        elif type(f) is Annotation:
+            if f.class_id >= max_class_nr:
+                raise ValidationError({'error': f'Class id out of range: {name}'})
+
     ratio = ps.train_test_ratio
 
     # find all annotations

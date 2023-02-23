@@ -186,14 +186,6 @@ def upload(project_id: int):
         return jsonify({'error': f'Files field not found'}), 400
     uploaded_files = _check_files(files)
 
-    # check that all images have unique name
-    seen = set()
-    for f, name in uploaded_files:
-        if type(f) is not Image:
-            continue
-        if name in seen:
-            return jsonify({'error': f'Duplicate images found: {name}'}), 400
-        seen.add(name)
     passed, failed, annotations = upload_files(uploaded_files, project_id, uploader, split)
     return jsonify(
         {'message': f'Uploaded {passed} images and {annotations} annotations. There were {failed} failed images'}), 201
