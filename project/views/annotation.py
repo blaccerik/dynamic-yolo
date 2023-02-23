@@ -2,15 +2,9 @@ from flask import Blueprint, jsonify, request
 
 from project.models.annotation import Annotation
 from project.schemas.annotation import AnnotationSchema
-from project.services.annotation_service import retrieve_annotations, retrieve_annotation, change_annotation_values
+from project.services.annotation_service import retrieve_annotation, change_annotation_values
 
 REQUEST_API = Blueprint('annotations', __name__, url_prefix="/annotations")
-
-
-@REQUEST_API.route('/', methods=['GET'])
-def get_annotations():
-    annotations = retrieve_annotations()
-    return annotations
 
 
 @REQUEST_API.route('/<int:annotation_id>', methods=['GET'])

@@ -1,17 +1,10 @@
 from flask import Blueprint, request, jsonify, send_file
-from project.services.model_service import get_models, get_model, model_info
+from project.services.model_service import  get_model, model_info
 
 import io
 import torch
 
 REQUEST_API = Blueprint('models', __name__, url_prefix="/models")
-
-
-@REQUEST_API.route('/', methods=['GET'])
-def get_all_models():
-    models = get_models()
-
-    return models
 
 
 @REQUEST_API.route('/<int:model_id>', methods=['GET'])

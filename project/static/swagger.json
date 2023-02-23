@@ -367,12 +367,23 @@
         }
       }
     },
-    "/models": {
+    "/projects/{project_id}/models": {
       "get": {
         "tags": [
-          "Models Requests"
+          "Project Requests"
         ],
-        "summary": "Get all models",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "description": "ID of the project to get models for",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "summary": "Get all models in a project",
         "responses": {
           "200": {
             "description": "List of models",
@@ -457,12 +468,23 @@
         }
       }
     },
-    "/annotations": {
+    "/projects/{project_id}/annotations": {
       "get": {
         "tags": [
-          "Annotations Requests"
+          "Project Requests"
         ],
-        "summary": "Get all annotations",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "description": "ID of the project to get annotations for",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "summary": "Get all annotations of a project",
         "responses": {
           "200": {
             "description": "List of annotations",
