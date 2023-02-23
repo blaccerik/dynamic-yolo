@@ -4,29 +4,6 @@ from project import db
 from marshmallow import ValidationError
 
 
-def retrieve_annotations():
-    """
-    Get all annotations.
-    :return:
-    """
-    annotations_and_annotators = db.session.query(Annotation, Annotator).join(Annotator,
-                                                                              Annotation.annotator_id == Annotator.id)
-
-    annotations_to_return = []
-
-    for annotation, annotator in annotations_and_annotators:
-        annotation_id = annotation.id
-        project_id = annotation.project_id
-        annotator_name = annotator.name
-        image_id = annotation.image_id
-        annotations_to_return.append({"annotation_id": annotation_id,
-                                      "project_id": project_id,
-                                      "annotator_name": annotator_name,
-                                      "image_id": image_id})
-
-    return annotations_to_return
-
-
 def retrieve_annotation(annotation_code):
     annotation = db.session.query(Annotation, Annotator).join(Annotator,
                                                               Annotation.annotator_id == Annotator.id).filter(

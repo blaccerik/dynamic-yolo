@@ -3,9 +3,11 @@ from marshmallow import ValidationError
 from project import db
 from sqlalchemy import func, and_
 from project.models.annotation import Annotation
+from project.models.annotator import Annotator
 from project.models.image import Image
 from project.models.initial_model import InitialModel
 from project.models.model import Model
+from project.models.model_status import ModelStatus
 from project.models.project import Project
 from project.models.project_settings import ProjectSettings
 from project.models.project_status import ProjectStatus
@@ -164,3 +166,54 @@ def get_all_projects():
     Get all projects
     """
     return Project.query.all()
+
+
+def get_models(project_code):
+    """
+    Get all models
+    :return:
+    """
+
+    models = Model().query.filter(Model.project_id == project_code).all()
+    serialized_models = []
+
+    # Add the model_status_name for better readability
+    for model in models:
+        model_dict = model.__dict__
+        model_status = ModelStatus.query.get(model.model_status_id)
+        model_dict['model_status_name'] = model_status.name
+
+        result = {'id': model_dict['id'],
+                  'project_id': model_dict['project_id'],
+                  'model_status_name': model_dict['model_status_name'],
+                  'added': model_dict['added']
+                  }
+
+        serialized_models.append(result)
+
+    return serialized_models
+
+
+def retrieve_annotations(project_code):
+    """
+    Get all annotations.
+    :return:
+    """
+    annotations_and_annotators = db.session.query(Annotation, Annotator) \
+        .join(Annotator, Annotation.annotator_id == Annotator.id) \
+        .filter(
+        Annotation.project_id == project_code)
+
+    annotations_to_return = []
+
+    for annotation, annotator in annotations_and_annotators:
+        annotation_id = annotation.id
+        project_id = annotation.project_id
+        annotator_name = annotator.name
+        image_id = annotation.image_id
+        annotations_to_return.append({"annotation_id": annotation_id,
+                                      "project_id": project_id,
+                                      "annotator_name": annotator_name,
+                                      "image_id": image_id})
+
+    return annotations_to_return

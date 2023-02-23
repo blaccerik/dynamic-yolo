@@ -11,7 +11,7 @@ from project.services.file_upload_service import upload_files
 from project.models.annotation import Annotation
 from project.models.image import Image
 from project.services.project_service import create_project, get_all_projects, get_project_info, \
-    change_settings, get_settings, get_images
+    change_settings, get_settings, get_images, get_models, retrieve_annotations
 from project.schemas.project import Project
 from project.schemas.upload import Upload
 from project.schemas.projectsettings import ProjectSettingsSchema
@@ -189,3 +189,16 @@ def upload(project_id: int):
     passed, failed, annotations = upload_files(uploaded_files, project_id, uploader, split)
     return jsonify(
         {'message': f'Uploaded {passed} images and {annotations} annotations. There were {failed} failed images'}), 201
+
+
+@REQUEST_API.route('/<int:project_id>/models', methods=['GET'])
+def get_all_models(project_id):
+    models = get_models(project_id)
+
+    return models
+
+
+@REQUEST_API.route('/<int:project_id>/annotations', methods=['GET'])
+def get_annotations(project_id):
+    annotations = retrieve_annotations(project_id)
+    return annotations
