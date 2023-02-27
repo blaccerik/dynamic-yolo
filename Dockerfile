@@ -25,19 +25,24 @@ RUN pip3 install --upgrade pip setuptools wheel
 RUN apt-get update \
     && apt-get -y install libpq-dev gcc
 
-#RUN pip3 install matplotlib
+# cv2 libaries
+RUN apt-get update && apt-get install ffmpeg libsm6 libxext6  -y
 
-#RUN apk --update add bash nano
+# git (for yolo)
+RUN apt-get install git -y
 
-# numpy
-# RUN apk --no-cache add musl-dev linux-headers g++
-
-# matplot lib depen
-
-# RUN pip install numpy==1.23.4
-# RUN pip install matplotlib
-#ENV STATIC_URL /static
-#ENV STATIC_PATH /var/www/app/static
 COPY requirements.txt /var/www/requirements.txt
-ENTRYPOINT [ "bash"]
+
+RUN pip install -r /var/www/requirements.txt
+
+# Copy project
+COPY project /var/www/project
+COPY app.py /var/www/app.py
+COPY config.py /var/www/config.py
+COPY .env /var/www/.env
+
+WORKDIR /var/www
+
+#ENTRYPOINT ["flask", "--app", "app", "run"]
+ENTRYPOINT ["waitress-serve", "--host", "0.0.0.0", "--call", "project:create_app"]
 #RUN pip install -r /var/www/requirements.txt

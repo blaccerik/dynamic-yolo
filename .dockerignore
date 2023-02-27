@@ -1,1 +1,15 @@
 .git
+.git/**/*
+gen
+gen/**/*
+docker
+tests
+tests/**/*
+**/prototype
+**/prototype/**/*
+prototype
+prototype/**/*
+venv
+venv/**/*
+.idea
+.idea/**/*
