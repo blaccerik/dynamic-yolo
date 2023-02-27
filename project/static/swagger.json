@@ -679,6 +679,9 @@
           "batch_size": {
             "type": "integer"
           },
+          "img_size": {
+            "type": "integer"
+          },
           "initial_model": {
             "type": "string",
             "format": "string"

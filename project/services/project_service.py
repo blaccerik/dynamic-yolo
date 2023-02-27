@@ -152,6 +152,7 @@ def get_settings(project_code: int) -> dict:
         "max_class_nr": project_settings.max_class_nr,
         "epochs": project_settings.epochs,
         "batch_size": project_settings.batch_size,
+        "img_size": project_settings.img_size,
         "initial_model": name,
         "confidence_threshold": project_settings.confidence_threshold,
         "train_test_ratio": project_settings.train_test_ratio,
