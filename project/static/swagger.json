@@ -482,6 +482,28 @@
             "schema": {
               "type": "integer"
             }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "Number of annotations to be returned per page",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "page_nr",
+            "in": "query",
+            "description": "Page number",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
           }
         ],
         "summary": "Get all annotations of a project",
