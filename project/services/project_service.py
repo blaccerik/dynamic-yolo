@@ -195,7 +195,7 @@ def get_models(project_code):
     return serialized_models
 
 
-def retrieve_annotations(project_code):
+def retrieve_annotations(project_code, page_nr, page_size):
     """
     Get all annotations.
     :return:
@@ -203,7 +203,8 @@ def retrieve_annotations(project_code):
     annotations_and_annotators = db.session.query(Annotation, Annotator) \
         .join(Annotator, Annotation.annotator_id == Annotator.id) \
         .filter(
-        Annotation.project_id == project_code)
+        Annotation.project_id == project_code) \
+        .paginate(page=page_nr, per_page=page_size, error_out=False)
 
     annotations_to_return = []
 
