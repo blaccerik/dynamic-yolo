@@ -601,6 +601,77 @@
           }
         }
       }
+    },
+    "/results": {
+      "get": {
+        "tags": [
+          "Results Requests"
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "query",
+            "description": "Specify the project of which results you want to see",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "summary": "Get all the results",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/simple_model_results"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Invalid project"
+          }
+        }
+      }
+    },
+    "/results/{result_id}": {
+      "get": {
+        "tags": [
+          "Results Requests"
+        ],
+        "summary": "Get detailed info about trained model",
+        "parameters": [
+          {
+            "name": "result_id",
+            "in": "path",
+            "description": "Result ID",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Results info",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/detailed_model_results"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Result not found"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -867,65 +938,6 @@
           "image_id"
         ]
       },
-      "ModelResults": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "model_id": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "subset_id": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "epoch": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "metric_precision": {
-            "type": "number",
-            "format": "float"
-          },
-          "metric_recall": {
-            "type": "number",
-            "format": "float"
-          },
-          "metric_map_50": {
-            "type": "number",
-            "format": "float"
-          },
-          "metric_map_50_95": {
-            "type": "number",
-            "format": "float"
-          },
-          "val_box_loss": {
-            "type": "number",
-            "format": "float"
-          },
-          "val_obj_loss": {
-            "type": "number",
-            "format": "float"
-          },
-          "val_cls_loss": {
-            "type": "number",
-            "format": "float"
-          }
-        },
-        "required": [
-          "id",
-          "model_id",
-          "subset_id",
-          "metric_precision",
-          "metric_recall",
-          "metric_map_50",
-          "metric_map_50_95",
-          "val_box"
-        ]
-      },
       "Queue": {
         "type": "object",
         "properties": {
@@ -1027,6 +1039,96 @@
       },
       "annotation_id": {
         "type": "integer"
+      },
+      "simple_model_results": {
+        "type": "object",
+        "properties": {
+          "result_id": {
+            "type": "integer"
+          },
+          "project_id": {
+            "type": "integer"
+          },
+          "metric_precision": {
+            "type": "number",
+            "format": "float"
+          },
+          "metric_recall": {
+            "type": "number",
+            "format": "float"
+          },
+          "metric_map_50": {
+            "type": "number",
+            "format": "float"
+          },
+          "metric_map_50_95": {
+            "type": "number",
+            "format": "float"
+          }
+        }
+      },
+      "detailed_model_results": {
+        "type": "object",
+        "properties": {
+          "result_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "model_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "project_id": {
+            "type": "integer"
+          },
+          "subset_name": {
+            "type": "string"
+          },
+          "epoch": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "metric_precision": {
+            "type": "number",
+            "format": "float"
+          },
+          "metric_recall": {
+            "type": "number",
+            "format": "float"
+          },
+          "metric_map_50": {
+            "type": "number",
+            "format": "float"
+          },
+          "metric_map_50_95": {
+            "type": "number",
+            "format": "float"
+          },
+          "val_box_loss": {
+            "type": "number",
+            "format": "float"
+          },
+          "val_obj_loss": {
+            "type": "number",
+            "format": "float"
+          },
+          "val_cls_loss": {
+            "type": "number",
+            "format": "float"
+          }
+        },
+        "required": [
+          "model_id",
+          "subset_id",
+          "metric_precision",
+          "metric_recall",
+          "metric_map_50",
+          "metric_map_50_95",
+          "val_box_loss",
+          "val_obj_loss",
+          "val_cls_loss"
+        ]
       }
     }
   }
