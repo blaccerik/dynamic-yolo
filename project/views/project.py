@@ -193,26 +193,6 @@ def get_project_images(project_id):
     return jsonify(images), 200
 
 
-@REQUEST_API.route('/<int:project_id>/upload', methods=["POST"])
-def upload(project_id: int):
-    data = request.form
-    errors = Upload().validate(data)
-
-    if errors:
-        return jsonify({'error': f'Please check the following fields: {errors}'}), 400
-
-    uploader = data["uploader_name"]
-    split = data["split"]
-    files = request.files.getlist("files")
-    if files is None:
-        return jsonify({'error': f'Files field not found'}), 400
-    uploaded_files = _check_files(files)
-
-    passed, failed, annotations = upload_files(uploaded_files, project_id, uploader, split)
-    return jsonify(
-        {'message': f'Uploaded {passed} images and {annotations} annotations. There were {failed} failed images'}), 201
-
-
 @REQUEST_API.route('/<int:project_id>/models', methods=['GET'])
 def get_all_models(project_id):
     models = get_models(project_id)
