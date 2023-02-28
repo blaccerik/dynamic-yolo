@@ -1,11 +1,9 @@
 import io
 from flask_testing import TestCase
-from unittest.mock import patch
 from project import create_app, db
 from initialize_database_for_endpoints import create_database_for_testing
 from PIL import Image
 from io import BytesIO
-from project.models.annotation import Annotation
 
 
 class ProjectUploadTest(TestCase):
@@ -17,30 +15,119 @@ class ProjectUploadTest(TestCase):
         db.drop_all()
         db.create_all()
         create_database_for_testing(db)
+        self.image = BytesIO()
+        image = Image.new('RGB', size=(640, 640), color=(255, 0, 0))
+        image.save(self.image, 'png')
+        self.image.seek(0)
 
     def tearDown(self):
         db.session.remove()
         db.drop_all()
 
-    @patch('project.services.file_upload_service.upload_files')
-    def test_upload_endpoint(self, mock_upload_files):
-        file_content = BytesIO()
-        image = Image.new('RGB', size=(640, 640), color=(255, 0, 0))
-        image.save(file_content, 'png')
-        file_content.seek(0)
+        # Start of testing errors in file_upload_service.py
 
+    def test_upload_endpoint(self):
         files = [
-            (file_content, 'image1.png'),
-            (io.BytesIO(b'1 0.5 0.5 0.1 0.1\n'), 'annotation1.txt')
+            (self.image, 'image1.png'),
+            (io.BytesIO(b'1 0.5 0.5 0.1 0.1\n'), 'image1.txt')
         ]
-
-        response = self.client.post('projects/2/upload', data={'uploader_name': 'human', 'split': 'train', 'files': files},
+        response = self.client.post('projects/2/upload',
+                                    data={'uploader_name': 'human', 'split': 'train', 'files': files},
                                     content_type='multipart/form-data', buffered=True,
                                     follow_redirects=True
                                     )
-        print(response.json)
-        self.assertEqual(response.status_code, 201)
-        self.assertEqual(response.json, {'message': 'Uploaded 2 images and 3 annotations. There were 1 failed images'})
-        mock_upload_files.assert_called_once_with([(b'file_content', 'image1.jpg'),
-                                                   (Annotation(x_center=0.5, y_center=0.5, width=0.1, height=0.1,
-                                                               class_id=1, annotation_id='annotation1'),)])
+        assert response.status_code == 201
+        assert response.json == {'message': 'Uploaded 1 images and 1 annotations. There were 0 failed images'}
+
+    def test_upload_files_with_unknown_split(self):
+        files = [
+            (self.image, 'image1.png'),
+            (io.BytesIO(b'1 0.5 0.5 0.1 0.1\n'), 'image1.txt')
+        ]
+        response = self.client.post('projects/2/upload',
+                                    data={'uploader_name': 'human', 'split': 'unknown', 'files': files},
+                                    content_type='multipart/form-data', buffered=True,
+                                    follow_redirects=True
+                                    )
+
+        assert response.json == {'error': 'Unknown split unknown'}
+
+    def test_upload_files_with_unknown_project(self):
+        files = [
+            (self.image, 'image1.png'),
+            (io.BytesIO(b'1 0.5 0.5 0.1 0.1\n'), 'image1.txt')
+        ]
+        response = self.client.post('projects/5/upload',
+                                    data={'uploader_name': 'human', 'split': 'train', 'files': files},
+                                    content_type='multipart/form-data', buffered=True,
+                                    follow_redirects=True
+                                    )
+        assert response.json == {'error': 'Project not found'}
+
+    def test_upload_files_with_unknown_user(self):
+        files = [
+            (self.image, 'image1.png'),
+            (io.BytesIO(b'1 0.5 0.5 0.1 0.1\n'), 'image1.txt')
+        ]
+        response = self.client.post('projects/5/upload',
+                                    data={'uploader_name': 'alien', 'split': 'train', 'files': files},
+                                    content_type='multipart/form-data', buffered=True,
+                                    follow_redirects=True
+                                    )
+        assert response.json == {'error': 'User not found'}
+
+    def test_upload_into_unknown_project(self):
+        files = [
+            (self.image, 'image1.png'),
+            (io.BytesIO(b'1 0.5 0.5 0.1 0.1\n'), 'image1.txt')
+        ]
+        response = self.client.post('projects/1/upload',
+                                    data={'uploader_name': 'human', 'split': 'train', 'files': files},
+                                    content_type='multipart/form-data', buffered=True,
+                                    follow_redirects=True
+                                    )
+        assert response.json == {'error': "Can't upload to 'unknown' project"}
+
+    def test_upload_with_duplicate_images(self):
+        duplicate_image = BytesIO()
+        image = Image.new('RGB', size=(640, 640), color=(255, 0, 0))
+        image.save(duplicate_image, 'png')
+        duplicate_image.seek(0)
+        files = [
+            (self.image, 'image1.png'),
+            (io.BytesIO(b'1 0.5 0.5 0.1 0.1\n'), 'image1.txt'),
+            (duplicate_image, 'image1.png')
+        ]
+
+        response = self.client.post('projects/3/upload',
+                                    data={'uploader_name': 'human', 'split': 'train', 'files': files},
+                                    content_type='multipart/form-data', buffered=True,
+                                    follow_redirects=True
+                                    )
+        assert response.json == {'error': 'Duplicate images found: image1'}
+
+    def test_upload_files_with_class_id_out_of_range(self):
+        files = [
+            (self.image, 'image1.png'),
+            (io.BytesIO(b'100 0.5 0.5 0.1 0.1\n'), 'image1.txt')
+        ]
+        response = self.client.post('projects/3/upload',
+                                    data={'uploader_name': 'human', 'split': 'train', 'files': files},
+                                    content_type='multipart/form-data', buffered=True,
+                                    follow_redirects=True
+                                    )
+        assert response.json == {'error': 'Class id out of range: image1'}
+
+    #  Start of testing errors in views/project.py
+
+    # def test_annotation_has_right_parameters(self):
+    #     # TODO check the source code and validate the error handling in there
+    #     files = [(io.BytesIO(b'-3 4 0.5 0.1 0.1\n'), 'image1.txt')]
+    #
+    #     response = self.client.post('projects/3/upload',
+    #                                 data={'uploader_name': 'human', 'split': 'train', 'files': files},
+    #                                 content_type='multipart/form-data', buffered=True,
+    #                                 follow_redirects=True
+    #                                 )
+    #     print(response.json)
+    #     assert 1 == 0
