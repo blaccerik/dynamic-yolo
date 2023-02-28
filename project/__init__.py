@@ -7,6 +7,10 @@ from flask import Flask, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from flask_swagger_ui import get_swaggerui_blueprint
 from werkzeug.serving import is_running_from_reloader
+import torch
+
+print(torch.cuda.is_available())
+print(torch.cuda.get_device_name(0))
 
 db = SQLAlchemy()
 

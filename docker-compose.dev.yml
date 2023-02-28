@@ -30,8 +30,15 @@ services:
           memory: 20g
         reservations:
           memory: 20g
-    # remove tty to not keep it alive
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [ gpu ]
+      # remove tty to not keep it alive
     tty: true
+    # yolo memory problem
+    # Unexpected bus error encountered in worker. This might be caused by insufficient shared memory (shm).
+    ipc: host
     networks:
       - yolo
     depends_on:
