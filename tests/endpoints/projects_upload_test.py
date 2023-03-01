@@ -24,7 +24,7 @@ class ProjectUploadTest(TestCase):
         db.session.remove()
         db.drop_all()
 
-        # Start of testing errors in file_upload_service.py
+    # Start of testing errors in file_upload_service.py
 
     def test_upload_endpoint(self):
         files = [
@@ -118,16 +118,16 @@ class ProjectUploadTest(TestCase):
                                     )
         assert response.json == {'error': 'Class id out of range: image1'}
 
-    #  Start of testing errors in views/project.py
+    # Start of testing errors in views/project.py
 
-    # def test_annotation_has_right_parameters(self):
-    #     # TODO check the source code and validate the error handling in there
-    #     files = [(io.BytesIO(b'-3 4 0.5 0.1 0.1\n'), 'image1.txt')]
-    #
-    #     response = self.client.post('projects/3/upload',
-    #                                 data={'uploader_name': 'human', 'split': 'train', 'files': files},
-    #                                 content_type='multipart/form-data', buffered=True,
-    #                                 follow_redirects=True
-    #                                 )
-    #     print(response.json)
-    #     assert 1 == 0
+    def test_annotation_has_right_parameters(self):
+        # TODO Finish later
+        files = [(io.BytesIO(b'-3 4 0.5 0.1 0.1\n'), 'image1.txt')]
+
+        response = self.client.post('projects/3/upload',
+                                    data={'uploader_name': 'human', 'split': 'train', 'files': files},
+                                    content_type='multipart/form-data', buffered=True,
+                                    follow_redirects=True
+                                    )
+
+        assert response.status_code == 400

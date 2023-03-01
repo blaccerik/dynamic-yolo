@@ -1,3 +1,5 @@
+import os
+
 from project.models.image import Image
 from project.models.annotation import Annotation
 from project.models.annotator import Annotator
@@ -63,6 +65,11 @@ def create_database_for_testing(db):
     pros2 = ProjectSettings(id=pro2.id, max_class_nr=80)
     db.session.add(pros2)
     db.session.commit()
+
+    image1 = Image(image=os.urandom(200), height=2, width=2, project_id=pro2.id, subset_id=iss1.id)
+    image2 = Image(image=os.urandom(200), height=2, width=2, project_id=pro2.id, subset_id=iss1.id)
+    db.session.add_all([image1, image2])
+    db.session.flush()
 
     a1 = Annotator()
     a1.name = "model"
