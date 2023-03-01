@@ -203,5 +203,10 @@ def get_all_models(project_id):
 
 @REQUEST_API.route('/<int:project_id>/annotations', methods=['GET'])
 def get_annotations(project_id):
-    annotations = retrieve_annotations(project_id)
-    return annotations
+    page_size = request.args.get("page_size")
+    page_size = validate_page_size(page_size, 20, 100)
+    page_nr = request.args.get("page_nr")
+    page_nr = validate_page_nr(page_nr)
+
+    annotations = retrieve_annotations(project_id, page_nr, page_size)
+    return jsonify(annotations), 200
