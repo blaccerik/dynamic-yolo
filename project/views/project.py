@@ -193,6 +193,7 @@ def get_project_images(project_id):
     return jsonify(images), 200
 
 
+
 @REQUEST_API.route('/<int:project_id>/models', methods=['GET'])
 def get_all_models(project_id):
     models = get_models(project_id)

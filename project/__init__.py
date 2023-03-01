@@ -3,26 +3,47 @@ import os
 import pathlib
 
 from apscheduler.schedulers.background import BackgroundScheduler
-from flask import Flask
+from flask import Flask, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
+from flask_swagger_ui import get_swaggerui_blueprint
 from werkzeug.serving import is_running_from_reloader
+import torch
+
+print(torch.cuda.is_available())
+print(torch.cuda.get_device_name(0))
 
 db = SQLAlchemy()
 
 # /home/...../dynamic-yolo/project
 APP_ROOT_PATH = pathlib.Path(__file__).parent.resolve()
 
+### swagger specific ###
+SWAGGER_URL = '/swagger'
+API_URL = '/static/swagger.json'
+SWAGGERUI_BLUEPRINT = get_swaggerui_blueprint(
+    SWAGGER_URL,
+    API_URL,
+    config={
+        'app_name': "Dynamic yolo swagger"
+    }
+)
+
+### end swagger specific ###
 
 def create_app(config_filename=None):
     # Create the Flask application
     app = Flask(__name__)
 
-    app.config.from_object(config_filename)
+    if config_filename is not None:
+        app.config.from_object(config_filename)
+    else:
+        app.config.from_object('config.ProductionConfig')
 
     initialize_extensions(app)
     register_blueprints(app)
     initialize_extensions(app)
     register_cli_commands(app)
+    init_swagger(app)
 
     if not is_running_from_reloader():
         from project.services.queue_service import update_queue
@@ -86,12 +107,22 @@ def register_blueprints(app):
     app.register_blueprint(validation_error.validation_error)
 
 
+def init_swagger(app):
+    @app.route("/static/<path:path>")
+    def send_static(path):
+        """
+        Swagger path
+        """
+        return send_from_directory("static", path)
+
 def register_cli_commands(app):
     @app.cli.command('init_db')
     def initialize_database():
         """Initialize the database."""
         create_database(app)
         print('Database created!')
+
+    app.register_blueprint(SWAGGERUI_BLUEPRINT, url_prefix=SWAGGER_URL)
 
 
 def create_database(app):

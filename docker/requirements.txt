@@ -7,7 +7,7 @@ asttokens==2.1.0
 attrs==22.1.0
 Babel==2.11.0
 backcall==0.2.0
-backports.zoneinfo==0.2.1;python_version<"3.9"
+backports.zoneinfo==0.2.1
 beautifulsoup4==4.11.1
 bleach==5.0.1
 cachetools==5.2.0
@@ -154,7 +154,6 @@ tzdata==2022.7
 tzlocal==4.2
 urllib3==1.26.12
 visions==0.7.5
-waitress==2.1.2
 watchdog==2.2.1
 wcwidth==0.2.5
 webencodings==0.5.1

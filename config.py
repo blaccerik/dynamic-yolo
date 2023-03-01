@@ -1,10 +1,13 @@
 import os
 
+from dotenv import load_dotenv
+
 # Determine the folder of the top-level directory of this project
 BASEDIR = os.path.abspath(os.path.dirname(__file__))
-
+load_dotenv()
 
 class Config(object):
+
     # ENV = 'development'
     # DEBUG = True
     # TESTING = False
@@ -16,7 +19,9 @@ class Config(object):
 
 
 class ProductionConfig(Config):
-    # ENV = 'production'
+    ENV = 'production'
+    SQLALCHEMY_DATABASE_URI = \
+        f"postgresql://{os.environ['DB_USERNAME']}:{os.environ['DB_PASSWORD']}@{os.environ['DB_LOCATION']}/{os.environ['DB_NAME']}"
     pass
 
 
