@@ -71,6 +71,12 @@ def create_database_for_testing(db):
     db.session.add_all([image1, image2])
     db.session.flush()
 
+    ms = ModelStatus.query.filter_by(name="ready").first()
+    m1 = Model(model_status_id=ms.id, project_id=pro2.id, total_epochs=3, epochs=3)
+    m2 = Model(model_status_id=ms.id, project_id=pro2.id, total_epochs=100, epochs=100)
+    db.session.add_all([m1, m2])
+    db.session.flush()
+
     a1 = Annotator()
     a1.name = "model"
     a2 = Annotator()
