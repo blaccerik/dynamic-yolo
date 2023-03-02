@@ -13,6 +13,14 @@ from project.models.subset import Subset
 from project.services.queue_service import add_to_queue
 
 
+BATCH_SIZE = 100
+class DictStorage:
+
+    def __init__(self):
+        self.annotations = []
+        self.has_annotations = False
+        self.image = None
+
 def upload_classes_to_db(project_name: str, classes: dict):
     """
     Upload classes to database.
@@ -39,9 +47,11 @@ def upload_file(file):
     db.session.commit()
 
 
-def _upload_images(images, location, ratio, split):
+def _upload_images(images, location, person, ratio, split):
     count = 0
     threshold = int(ratio * len(images))
+    image_nr = 0
+    ano_nr = 0
 
     ss_test = Subset.query.filter(Subset.name.like("test")).first()
     ss_train = Subset.query.filter(Subset.name.like("train")).first()
@@ -49,20 +59,32 @@ def _upload_images(images, location, ratio, split):
         subset_id = ss_test.id
     elif split == "train":
         subset_id = ss_train.id
-
-    for image in images.values():
+    for ds in images:
         if split == "random":
             if count > threshold:  # add to test
                 subset_id = ss_test.id
             else:  # add to train
                 subset_id = ss_train.id
+        image = ds.image
+        anos = ds.annotations
         image.project_id = location
         image.subset_id = subset_id
         db.session.add(image)
-        count += 1
+        db.session.flush()
+        image_nr += 1
+        for a in anos:
+            a.project_id = location
+            a.annotator_id = person
+            a.image_id = image.id
+            db.session.add(a)
+            ano_nr += 1
 
-    db.session.flush()  # generate ids
-    return count
+        count += 1
+        if count >= BATCH_SIZE:
+            db.session.commit()
+            count = 0
+    db.session.commit()
+    return image_nr, ano_nr
 
 
 def upload_files(files: list, project_code: int, uploader: str, split: str) -> (int, int, int):
@@ -95,54 +117,53 @@ def upload_files(files: list, project_code: int, uploader: str, split: str) -> (
     max_class_nr = ps.max_class_nr
     # check if all annotations are in range
     # check that all images have unique name
-    seen = set()
+    cache = {}
     for f, name in files:
         if type(f) is Image:
-            if name in seen:
+            if name in cache:
+                entry = cache[name]
+            else:
+                entry = DictStorage()
+            if entry.image is not None:
                 raise ValidationError({'error': f'Duplicate images found: {name}'})
-            seen.add(name)
+            entry.image = f
+            cache[name] = entry
+
         elif type(f) is Annotation:
             if f.class_id >= max_class_nr:
                 raise ValidationError({'error': f'Class id out of range: {name}'})
-
+            if name in cache:
+                entry = cache[name]
+            else:
+                entry = DictStorage()
+            entry.has_annotations = True
+            entry.annotations.append(f)
+            cache[name] = entry
+        elif f is None:
+            if name in cache:
+                entry = cache[name]
+            else:
+                entry = DictStorage()
+            entry.has_annotations = True
+            cache[name] = entry
     ratio = ps.train_test_ratio
+    # filter cache for good and bad images
 
-    # find all annotations
-    annotations = {x[1] for x in files if type(x[0]) is Annotation}
-
-    # find images
-    failed_images = {}
-    passed_images = {}
-    for f in files:
-        image, name = f
-        if type(image) is not Image:
+    passed_images = []
+    failed_images = []
+    for ds in cache.values():
+        if ds.image is None:
             continue
-
-        if name in annotations:
-            passed_images[name] = image
+        if not ds.has_annotations:
+            failed_images.append(ds)
         else:
-            failed_images[name] = image
+            passed_images.append(ds)
 
     # upload images
-    passed_images_number = _upload_images(passed_images, project.id, ratio, split)
-    failed_images_number = _upload_images(failed_images, unknown_project.id, ratio, split)
-    annotations_number = 0
+    passed_images_number, annotations_number = _upload_images(passed_images, project.id, annotator.id, ratio, split)
+    failed_images_number, _ = _upload_images(failed_images, unknown_project.id, annotator.id, ratio, split)
 
-    # upload only passed image's annotations
-    for f in files:
-        ano, name = f
-        if type(ano) is not Annotation:
-            continue
-
-        if name in passed_images:
-            i = passed_images[name]
-            ano.project_id = project.id
-            ano.annotator_id = annotator.id
-            ano.image_id = i.id
-            db.session.add(ano)
-            annotations_number += 1
-
-    db.session.commit()
+    # add to queue
     add_to_queue(project.id)
     return passed_images_number, failed_images_number, annotations_number
 

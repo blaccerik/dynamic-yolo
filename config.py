@@ -11,6 +11,7 @@ class Config(object):
     # ENV = 'development'
     # DEBUG = True
     # TESTING = False
+    MAX_CONTENT_LENGTH = 1024 * 1024 * 1024 # 1gb
     JSON_SORT_KEYS = False
     SECRET_KEY = os.getenv('SECRET_KEY')
     SQLALCHEMY_DATABASE_URI = \

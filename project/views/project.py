@@ -1,10 +1,13 @@
+import cgi
 import io
+import re
 import tarfile
 from io import BytesIO
 
 import PIL
 from flask import Blueprint, request, jsonify
 from marshmallow import ValidationError
+from werkzeug.datastructures import MultiDict
 from werkzeug.utils import secure_filename
 
 from project.services.file_upload_service import upload_files
@@ -37,6 +40,9 @@ def _text_to_annotations(content, filename):
     _list = []
     name = filename.split(".")[0]
     text = str(content, "utf-8")
+    if text == "":
+        return [(None, name)]
+
     for line in text.splitlines():
         try:
             nr, x, y, w, h = line.strip().split(" ")
@@ -63,6 +69,7 @@ def _text_to_annotations(content, filename):
     return _list
 
 
+
 def _bytes_to_image(content, filename):
     try:
         img = PIL.Image.open(io.BytesIO(content))
@@ -70,24 +77,6 @@ def _bytes_to_image(content, filename):
         raise ValidationError({"error": f"Can't read file: {filename}"})
     name = filename.split(".")[0]
     return Image(image=content, width=img.size[0], height=img.size[1]), name
-
-
-def _check_files(files):
-    final_files = []
-    for file in files:
-        filename = secure_filename(file.filename)
-        content = file.stream.read()
-        file.stream.close()
-        if filename.endswith(".txt"):
-            annotations = _text_to_annotations(content, filename)
-            final_files.extend(annotations)
-        elif filename.endswith(".png") or filename.endswith(".jpg"):
-            final_files.append(_bytes_to_image(content, filename))
-        elif filename.endswith(".tar.gz"):
-            final_files.extend(_check_zip_file(content))
-        else:
-            raise ValidationError({'error': f'not supported parsing {filename}'})
-    return final_files
 
 
 def _check_zip_file(content):
@@ -108,6 +97,23 @@ def _check_zip_file(content):
         else:
             raise ValidationError({'error': f'not supported parsing {filename}'})
     return files
+
+def _check_files(files):
+    final_files = []
+    for file in files:
+        filename = secure_filename(file.filename)
+        content = file.stream.read()
+        file.stream.close()
+        if filename.endswith(".txt"):
+            annotations = _text_to_annotations(content, filename)
+            final_files.extend(annotations)
+        elif filename.endswith(".png") or filename.endswith(".jpg"):
+            final_files.append(_bytes_to_image(content, filename))
+        elif filename.endswith(".tar.gz"):
+            final_files.extend(_check_zip_file(content))
+        else:
+            raise ValidationError({'error': f'not supported parsing {filename}'})
+    return final_files
 
 
 @REQUEST_API.route('/', methods=['POST'])
@@ -133,7 +139,6 @@ def get_projects():
 
     return serialized_projects
 
-
 @REQUEST_API.route('/<int:project_id>/upload', methods=["POST"])
 def upload(project_id: int):
     data = request.form
@@ -148,8 +153,6 @@ def upload(project_id: int):
     if files is None:
         return jsonify({'error': f'Files field not found'}), 400
     uploaded_files = _check_files(files)
-    if type(uploaded_files) is tuple:
-        return uploaded_files
     passed, failed, annotations = upload_files(uploaded_files, project_id, uploader, split)
 
     return jsonify(
