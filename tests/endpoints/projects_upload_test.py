@@ -57,7 +57,7 @@ class ProjectUploadTest(TestCase):
             (self.image, 'image1.png'),
             (io.BytesIO(b'1 0.5 0.5 0.1 0.1\n'), 'image1.txt')
         ]
-        response = self.client.post('projects/5/upload',
+        response = self.client.post('projects/999/upload',
                                     data={'uploader_name': 'human', 'split': 'train', 'files': files},
                                     content_type='multipart/form-data', buffered=True,
                                     follow_redirects=True

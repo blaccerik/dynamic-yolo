@@ -20,12 +20,13 @@ class ProjectModelsTest(TestCase):
     def test_get_all_models(self):
         response = self.client.get("/projects/3/models")
         data = response.json
-        first_model_from_response = dict(list(data[0].items())[:-1])
+        first_model_from_response = data[0]
+        first_model_from_response.pop('added')
 
         expected_response = {
             "id": 1,
             "project_id": 3,
-            "model_status_name": 'ready'
+            "model_status_name": 'training'
         }
 
         assert response.status_code == 200

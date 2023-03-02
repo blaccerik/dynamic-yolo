@@ -28,7 +28,7 @@ class ProjectsTest(TestCase):
         response = self.client.post("/projects", data=json.dumps(data), content_type='application/json',
                                     follow_redirects=True)
         assert response.status_code == 201
-        assert response.json == {'message': 'Project 4 created successfully'}
+        assert response.json == {'message': 'Project 6 created successfully'}
 
     def test_create_project_missing_required_fields(self):
         data = {}

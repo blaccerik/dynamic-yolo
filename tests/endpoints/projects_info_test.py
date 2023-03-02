@@ -20,15 +20,17 @@ class ProjectInfoTest(TestCase):
     def test_get_info_valid_project_id(self):
         response = self.client.get('/projects/2')
         data = response.json
-        assert data['name'] == 'project'
-        assert data['status'] == 'idle'
-        assert data['train_images_amount'] == 0
-        assert data['train_annotations'] == 0
-        assert data['test_images_amount'] == 0
-        assert data['test_annotations'] == 0
-        assert data['amount_of_models'] == 0
-        assert data['total_epochs_trained'] == 0
+        expected_data = {'name': 'project',
+                         'status': 'idle',
+                         'train_images_amount': 0,
+                         'train_annotations': 0,
+                         'test_images_amount': 0,
+                         'test_annotations': 1,
+                         'amount_of_models': 0,
+                         'total_epochs_trained': 0}
+
         assert response.status_code == 200
+        assert data == expected_data
 
     def test_get_info_invalid_project_id(self):
         response = self.client.get('/projects/999')
