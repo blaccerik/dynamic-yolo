@@ -2,6 +2,9 @@ import logging
 import os
 import shutil
 
+import cv2
+import numpy as np
+import torch
 import yaml
 from sqlalchemy import and_
 from torch.cuda import OutOfMemoryError
@@ -19,6 +22,8 @@ from project.models.model_results import ModelResults
 from project.models.project_status import ProjectStatus
 from project.models.project import Project
 from project.models.project_settings import ProjectSettings
+from project.yolo.yolov5.utils.augmentations import letterbox
+from project.yolo.yolov5.utils.general import scale_boxes, xyxy2xywh
 
 
 def add_results_to_db(results, maps, model_id, subset_id, epoch=None) -> ModelResults:
@@ -45,6 +50,55 @@ def add_results_to_db(results, maps, model_id, subset_id, epoch=None) -> ModelRe
     db.session.commit()
 
     return mr
+
+class SqlStream:
+
+    def __init__(self, project_id, project_settings, ss_train_id):
+        self.project_id = project_id
+        self.project_settings = project_settings
+        self.ss_train_id = ss_train_id
+
+        # yolo dataloader
+        self.img_size = [640, 640]
+        self.stride = 32
+        self.auto = True
+
+    def get_all_train_images(self):
+        images = Image.query.filter(and_(
+            Image.project_id == self.project_id,
+            Image.subset_id == self.ss_train_id
+        ))
+        c = 0
+        for image in images.yield_per(self.project_settings.batch_size):
+            content = image.image
+            nparr = np.frombuffer(content, np.uint8)
+
+            # Decode numpy array into image
+            im0 = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+            im = letterbox(im0, self.img_size, stride=self.stride, auto=self.auto)[0]  # padded resize
+            im = im.transpose((2, 0, 1))[::-1]  # HWC to CHW, BGR to RGB
+            im = np.ascontiguousarray(im)  # contiguous
+
+            yield im, im0
+            c += 1
+            if c == 1:
+                break
+
+    def normalize_preds(self, pred, im0, im):
+        for i, det in enumerate(pred):  # per image
+            gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
+            if len(det):
+                # Rescale boxes from img_size to im0 size
+                det[:, :4] = scale_boxes(im.shape[2:], det[:, :4], im0.shape).round()
+                for *xyxy, conf, cls in reversed(det):
+
+                    xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
+                    line = (cls, *xywh, conf)
+
+                    print("fake", ('%g ' * len(line)).rstrip() % line)
+                    break
+
 
 # needs to be here to avoid circular import error
 from project.yolo.yolov5 import val, train, detect
@@ -74,13 +128,13 @@ class TrainSession:
             if model is None:  # model "exists" but weights are none
                 self.new_model = True
             else:
-                model = prev_model.model
+                self.prev_model = prev_model.model
                 total = prev_model.total_epochs
                 self.new_model = False
                 self.db_model.parent_model_id = prev_model_id
 
                 with open(f"{APP_ROOT_PATH}/yolo/data/weights.pt", "wb") as binary_file:
-                    binary_file.write(model)
+                    binary_file.write(self.prev_model)
         else:
             self.new_model = True
 
@@ -110,11 +164,18 @@ class TrainSession:
             return
 
         # todo use db stream and dont write to disk
-        images = Image.query.filter(Image.project_id == self.project.id)
-        for image in images:
+        images = Image.query.filter(and_(
+            Image.project_id == self.project.id
+            # Image.subset_id == self.ss_train_id
+        ))
+        c = 0
+        for image in images.yield_per(self.project_settings.batch_size):
             content = image.image
             with open(f"{APP_ROOT_PATH}/yolo/data/pretest_images/{image.id}.png", "wb") as binary_file:
                 binary_file.write(content)
+            c += 1
+            if c == 1:
+                break
 
     def pretest(self):
         if self.new_model:
@@ -137,7 +198,12 @@ class TrainSession:
 
         setattr(opt, "project", f"{APP_ROOT_PATH}/yolo/data/pretest_results")
         setattr(opt, "name", "yolo_test")
+        setattr(opt, "binary_weights", self.prev_model)
 
+        stream = SqlStream(self.project.id, self.project_settings, self.ss_train_id)
+        setattr(opt, "sql_stream", stream)
+        # print(self.db_model)
+        # print(len(self.prev_model))
         # run model
         detect.main(opt)
 
@@ -407,9 +473,14 @@ def start_training(project: Project) -> bool:
         shutil.rmtree(f"{APP_ROOT_PATH}/yolo/data")
     initialize_yolo_folders()
 
+    print("ts 1")
     ts = TrainSession(project, project_settings, name, ss_test.id, ss_train.id)
+    print("ts 2")
     ts.load_pretest()
+    print("ts 3")
     ts.pretest()
+    print("ts 10")
+    return False
     ts.load_yaml()
     ts.load_data()
     error = ts.train()
