@@ -66,8 +66,9 @@ def create_database_for_testing(db):
     db.session.add(pros2)
     db.session.commit()
 
-    image1 = Image(image=os.urandom(200), height=2, width=2, project_id=pro2.id, subset_id=iss1.id)
-    image2 = Image(image=os.urandom(200), height=2, width=2, project_id=pro2.id, subset_id=iss1.id)
+    image1 = Image(image=b'2', height=2, width=2, project_id=pro2.id, subset_id=iss1.id)
+    image2 = Image(image=b'3', height=2, width=2, project_id=pro2.id, subset_id=iss1.id)
+
     db.session.add_all([image1, image2])
     db.session.flush()
 
