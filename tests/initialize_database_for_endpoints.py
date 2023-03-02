@@ -79,7 +79,8 @@ def create_database_for_testing(db):
     ms_training = ModelStatus.query.filter_by(name="training").first()
     m1 = Model(model_status_id=ms_training.id, project_id=pro2.id, total_epochs=3, epochs=3, model=b'3')
     m2 = Model(model_status_id=ms_ready.id, project_id=pro2.id, total_epochs=100, epochs=100, model=binary_data)
-    db.session.add_all([m1, m2])
+    m3 = Model(model_status_id=ms_ready.id, project_id=pro.id, total_epochs=3, epochs=3, model=b'3')
+    db.session.add_all([m1, m2,m3])
     db.session.flush()
 
     a1 = Annotator()
@@ -114,4 +115,12 @@ def create_database_for_testing(db):
     queue1 = Queue(position=1, project_id=project_for_queue1.id)
     queue2 = Queue(position=2, project_id=project_for_queue2.id)
     db.session.add_all([queue1, queue2])
+    db.session.commit()
+
+    mr1 = ModelResults(model_id=m1.id, subset_id=iss1.id, metric_precision=0.1, metric_recall=0.2, metric_map_50=0.3,
+                       metric_map_50_95=0.4, val_box_loss=0.5, val_obj_loss=0.6, val_cls_loss=0.7)
+    mr2 = ModelResults(model_id=m3.id, subset_id=iss1.id, metric_precision=0.2, metric_recall=0.3, metric_map_50=0.4,
+                       metric_map_50_95=0.5, val_box_loss=0.6, val_obj_loss=0.7, val_cls_loss=0.8)
+
+    db.session.add_all([mr1, mr2])
     db.session.commit()

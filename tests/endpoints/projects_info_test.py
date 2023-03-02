@@ -26,7 +26,7 @@ class ProjectInfoTest(TestCase):
                          'train_annotations': 0,
                          'test_images_amount': 0,
                          'test_annotations': 1,
-                         'amount_of_models': 0,
+                         'amount_of_models': 1,
                          'total_epochs_trained': 0}
 
         assert response.status_code == 200
