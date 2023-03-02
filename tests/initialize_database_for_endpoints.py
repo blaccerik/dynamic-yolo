@@ -72,9 +72,13 @@ def create_database_for_testing(db):
     db.session.add_all([image1, image2])
     db.session.flush()
 
-    ms = ModelStatus.query.filter_by(name="ready").first()
-    m1 = Model(model_status_id=ms.id, project_id=pro2.id, total_epochs=3, epochs=3)
-    m2 = Model(model_status_id=ms.id, project_id=pro2.id, total_epochs=100, epochs=100)
+    with open("tests/model_for_testing.pt", "rb") as f:
+        binary_data = f.read()
+
+    ms_ready = ModelStatus.query.filter_by(name="ready").first()
+    ms_training = ModelStatus.query.filter_by(name="training").first()
+    m1 = Model(model_status_id=ms_training.id, project_id=pro2.id, total_epochs=3, epochs=3, model=b'3')
+    m2 = Model(model_status_id=ms_ready.id, project_id=pro2.id, total_epochs=100, epochs=100, model=binary_data)
     db.session.add_all([m1, m2])
     db.session.flush()
 
