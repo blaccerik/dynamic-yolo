@@ -91,8 +91,8 @@ def create_database_for_testing(db):
     db.session.commit()
 
     a = Annotator.query.filter_by(name="human").first()
-    a1 = Annotation(project_id=pro2.id, image_id=image1.id, annotator_id=a.id, x_center=40, y_center=30, width=20,
-                    height=10,
+    a1 = Annotation(project_id=pro2.id, image_id=image1.id, annotator_id=a.id, x_center=0.4, y_center=0.3, width=0.2,
+                    height=0.1,
                     class_id=0)
     a2 = Annotation(project_id=pro2.id, image_id=image1.id, annotator_id=a.id, x_center=0, y_center=0, width=0,
                     height=0,
