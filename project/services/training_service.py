@@ -94,10 +94,13 @@ class SqlStream:
                 for *xyxy, conf, cls in reversed(det):
 
                     xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
-                    line = (cls, *xywh, conf)
+                    # line = (cls, *xywh, conf)
+                    class_nr = cls.item()
+                    x, y, w, h = xywh
+                    conf = conf.item()
+                    # print(class_nr, x,y,w,h,conf)
 
-                    print("fake", ('%g ' * len(line)).rstrip() % line)
-                    break
+                    # todo use these results to pick bad images
 
 
 # needs to be here to avoid circular import error
@@ -163,19 +166,19 @@ class TrainSession:
         if self.new_model:
             return
 
-        # todo use db stream and dont write to disk
-        images = Image.query.filter(and_(
-            Image.project_id == self.project.id
-            # Image.subset_id == self.ss_train_id
-        ))
-        c = 0
-        for image in images.yield_per(self.project_settings.batch_size):
-            content = image.image
-            with open(f"{APP_ROOT_PATH}/yolo/data/pretest_images/{image.id}.png", "wb") as binary_file:
-                binary_file.write(content)
-            c += 1
-            if c == 1:
-                break
+        # # todo use db stream and dont write to disk
+        # images = Image.query.filter(and_(
+        #     Image.project_id == self.project.id
+        #     # Image.subset_id == self.ss_train_id
+        # ))
+        # c = 0
+        # for image in images.yield_per(self.project_settings.batch_size):
+        #     content = image.image
+        #     with open(f"{APP_ROOT_PATH}/yolo/data/pretest_images/{image.id}.png", "wb") as binary_file:
+        #         binary_file.write(content)
+        #     c += 1
+        #     if c == 1:
+        #         break
 
     def pretest(self):
         if self.new_model:
@@ -198,30 +201,32 @@ class TrainSession:
 
         setattr(opt, "project", f"{APP_ROOT_PATH}/yolo/data/pretest_results")
         setattr(opt, "name", "yolo_test")
+
+        # load model
         setattr(opt, "binary_weights", self.prev_model)
 
+        # load sql stream
         stream = SqlStream(self.project.id, self.project_settings, self.ss_train_id)
         setattr(opt, "sql_stream", stream)
-        # print(self.db_model)
-        # print(len(self.prev_model))
+
         # run model
         detect.main(opt)
 
-        # read results
-        for path in os.listdir(f"{APP_ROOT_PATH}/yolo/data/pretest_results/yolo_test/labels"):
-            self._read_file(path)
+        # # read results
+        # for path in os.listdir(f"{APP_ROOT_PATH}/yolo/data/pretest_results/yolo_test/labels"):
+        #     self._read_file(path)
 
-    def _read_file(self, path):
-        image_file = os.path.join(f"{APP_ROOT_PATH}/yolo/data/pretest_results/yolo_test/labels", path)
-        with open(image_file, "r") as f:
-            for line in f.readlines():
-                class_nr, _, _, _, _, conf = line.strip().split(" ")
-                conf = float(conf)
-                if conf < self.project_settings.confidence_threshold:
-                    return
-            nr, _ = path.split(".")
-            nr = int(nr)
-            self.good_images.add(nr)
+    # def _read_file(self, path):
+    #     image_file = os.path.join(f"{APP_ROOT_PATH}/yolo/data/pretest_results/yolo_test/labels", path)
+    #     with open(image_file, "r") as f:
+    #         for line in f.readlines():
+    #             class_nr, _, _, _, _, conf = line.strip().split(" ")
+    #             conf = float(conf)
+    #             if conf < self.project_settings.confidence_threshold:
+    #                 return
+    #         nr, _ = path.split(".")
+    #         nr = int(nr)
+    #         self.good_images.add(nr)
 
     def load_yaml(self):
         # create yaml file
