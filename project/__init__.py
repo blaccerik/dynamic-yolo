@@ -15,6 +15,14 @@ if torch.cuda.is_available():
 else:
     print("no gpu/cuda found")
 
+import resource
+
+# max_data_memory = int(os.getenv('RLIMIT_DATA', -1))
+# resource.setrlimit(resource.RLIMIT_DATA, (max_data_memory, max_data_memory))
+# in .env file
+# RLIMIT_DATA=2636870912 # 2.6gb
+
+
 db = SQLAlchemy()
 
 # /home/...../dynamic-yolo/project

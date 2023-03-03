@@ -7,7 +7,7 @@ import numpy as np
 import torch
 import yaml
 from sqlalchemy import and_
-from torch.cuda import OutOfMemoryError
+# from torch.cuda import OutOfMemoryError
 
 from project import db, APP_ROOT_PATH
 from project.models.annotation import Annotation
@@ -69,7 +69,7 @@ class SqlStream:
             Image.subset_id == self.ss_train_id
         ))
         c = 0
-        for image in images.yield_per(self.project_settings.batch_size):
+        for image in images.yield_per(DB_READ_BATCH_SIZE):
             content = image.image
             nparr = np.frombuffer(content, np.uint8)
 
@@ -106,6 +106,9 @@ class SqlStream:
 # needs to be here to avoid circular import error
 from project.yolo.yolov5 import val, train, detect
 
+
+DB_READ_BATCH_SIZE = 32
+
 class TrainSession:
     def __init__(self, project: Project,
                  project_settings: ProjectSettings,
@@ -123,6 +126,9 @@ class TrainSession:
         # create new model
         self.db_model = Model(model_status_id=self.ms_test.id, project_id=project.id, epochs=project_settings.epochs)
 
+        self.prev_model = None
+        self.yaml = None
+
         total = 0
         prev_model_id = project.latest_model_id
         if prev_model_id is not None:  # use prev model
@@ -131,7 +137,7 @@ class TrainSession:
             if model is None:  # model "exists" but weights are none
                 self.new_model = True
             else:
-                self.prev_model = prev_model.model
+                self.prev_model = model
                 total = prev_model.total_epochs
                 self.new_model = False
                 self.db_model.parent_model_id = prev_model_id
@@ -156,7 +162,7 @@ class TrainSession:
             with open(f"{APP_ROOT_PATH}/yolo/yolov5/models/{name}.yaml", "r") as stream:
                 yaml_file = yaml.safe_load(stream)
                 yaml_file["nc"] = self.project_settings.max_class_nr
-
+            self.yaml = yaml_file
             with open(f'{APP_ROOT_PATH}/yolo/data/backbone.yaml', 'w') as outfile:
                 yaml.dump(yaml_file, outfile, default_flow_style=False)
 
@@ -256,23 +262,33 @@ class TrainSession:
         images = Image.query.filter(Image.project_id == self.project.id)
 
         # filter out "good" images
-        images = [image for image in images if image.id not in self.good_images]
-        print(len(images), len(self.good_images))
+        # images = [image for image in images if image.id not in self.good_images]
+        # print(len(images), len(self.good_images))
+        has_train = 0
+        has_test = False
+        for image in images.yield_per(DB_READ_BATCH_SIZE):
 
-        for image in images:
+            if has_test and has_train >= 10000:
+                break
 
             # skip confident images
             if image.id in self.good_images:
                 continue
 
             if image.subset_id == self.ss_train_id:
+                if has_train >= 10000:
+                    continue
                 location = f"{APP_ROOT_PATH}/yolo/data/train"
+                has_train += 1
             elif image.subset_id == self.ss_test_id:
+                if has_test:
+                    continue
                 location = f"{APP_ROOT_PATH}/yolo/data/test"
+                has_test = True
             else:
                 print(image.subset_id, self.ss_train_id, self.ss_test_id)
                 raise RuntimeError("subset id not found")
-
+            # print(image)
             # save image
             content = image.image
             with open(f"{location}/images/{image.id}.png", "wb") as binary_file:
@@ -292,6 +308,7 @@ class TrainSession:
             # create db entry
             mi = ModelImage(model_id=self.db_model.id, image_id=image.id)
             db.session.add(mi)
+
         db.session.commit()
 
     def train(self):
@@ -319,6 +336,11 @@ class TrainSession:
         setattr(opt, "project", f"{APP_ROOT_PATH}/yolo/data/model")
         setattr(opt, "name", "yolo_train")
 
+        # TODO add option for ram storage
+        # setattr(opt, "cache", "ram")
+        # setattr(opt, "cache", "disk")  # dont use disk cache, super slow
+        setattr(opt, "workers", 1)
+
         if self.new_model:
             setattr(opt, "weights", "")
             setattr(opt, "cfg", f"{APP_ROOT_PATH}/yolo/data/backbone.yaml")
@@ -329,9 +351,21 @@ class TrainSession:
         # add model id to opt
         setattr(opt, "db_model_id", self.db_model.id)
         setattr(opt, "db_train_subset_id", self.ss_train_id)
+
+        stream = SqlStream(self.project.id, self.project_settings, self.ss_train_id)
+
         try:
-            train.main(opt)  # long process
-        except (OutOfMemoryError, RuntimeError):
+            train.main(opt, binary_weights=self.prev_model, yaml_dict=self.yaml, sql_stream=stream)  # long process
+        except torch.cuda.OutOfMemoryError as e:
+            print("out of gpu memory")
+            print(e)
+            self.db_model.model_status_id = self.ms_error.id
+            db.session.add(self.db_model)
+            db.session.commit()
+            return True
+        except cv2.error as e:
+            print("out of ram")
+            print(e)
             self.db_model.model_status_id = self.ms_error.id
             db.session.add(self.db_model)
             db.session.commit()
@@ -376,7 +410,7 @@ class TrainSession:
         settings = vars(opt)
         try:
             results, maps, t = val.run(**settings)
-        except (OutOfMemoryError, RuntimeError):
+        except (torch.cuda.OutOfMemoryError, RuntimeError):
             self.db_model.model_status_id = self.ms_error.id
             db.session.add(self.db_model)
             db.session.commit()
@@ -484,18 +518,23 @@ def start_training(project: Project) -> bool:
     ts.load_pretest()
     print("ts 3")
     ts.pretest()
-    print("ts 10")
-    return False
+    print("ts 4")
+    # return False
     ts.load_yaml()
+    print("ts 5")
     ts.load_data()
+    print("ts 6")
     error = ts.train()
     if error:
         print("Out of memory while training")
         return True
+    print("ts 7")
+    # return False
     error = ts.test()
     if error:
         print("Out of memory while testing")
         return True
+    print("ts 8")
     ts.cleanup()
     return False
 

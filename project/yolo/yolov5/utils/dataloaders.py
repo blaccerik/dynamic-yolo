@@ -115,7 +115,8 @@ def create_dataloader(path,
                       image_weights=False,
                       quad=False,
                       prefix='',
-                      shuffle=False):
+                      shuffle=False,
+                      sql_stream=None):
     if rect and shuffle:
         LOGGER.warning('WARNING ⚠️ --rect is incompatible with DataLoader shuffle, setting shuffle=False')
         shuffle = False
@@ -132,7 +133,8 @@ def create_dataloader(path,
             stride=int(stride),
             pad=pad,
             image_weights=image_weights,
-            prefix=prefix)
+            prefix=prefix,
+            sql_stream=sql_stream)
 
     batch_size = min(batch_size, len(dataset))
     nd = torch.cuda.device_count()  # number of CUDA devices
@@ -445,7 +447,9 @@ class LoadImagesAndLabels(Dataset):
                  stride=32,
                  pad=0.0,
                  min_items=0,
-                 prefix=''):
+                 prefix='',
+                 sql_stream=None):
+        self.sql_stream=sql_stream
         self.img_size = img_size
         self.augment = augment
         self.hyp = hyp
@@ -649,8 +653,8 @@ class LoadImagesAndLabels(Dataset):
     #     return self
 
     def __getitem__(self, index):
+        # print("dataloader get", index)
         index = self.indices[index]  # linear, shuffled, or image_weights
-
         hyp = self.hyp
         mosaic = self.mosaic and random.random() < hyp['mosaic']
         if mosaic:
@@ -725,10 +729,13 @@ class LoadImagesAndLabels(Dataset):
     def load_image(self, i):
         # Loads 1 image from dataset index 'i', returns (im, original hw, resized hw)
         im, f, fn = self.ims[i], self.im_files[i], self.npy_files[i],
+        # print(i, im, f ,fn)
         if im is None:  # not cached in RAM
             if fn.exists():  # load npy
                 im = np.load(fn)
+                print(f"exists {fn}")
             else:  # read image
+                # print(f"{i} read")
                 im = cv2.imread(f)  # BGR
                 assert im is not None, f'Image Not Found {f}'
             h0, w0 = im.shape[:2]  # orig hw
@@ -737,6 +744,7 @@ class LoadImagesAndLabels(Dataset):
                 interp = cv2.INTER_LINEAR if (self.augment or r > 1) else cv2.INTER_AREA
                 im = cv2.resize(im, (int(w0 * r), int(h0 * r)), interpolation=interp)
             return im, (h0, w0), im.shape[:2]  # im, hw_original, hw_resized
+        # print(f"{i} cache")
         return self.ims[i], self.im_hw0[i], self.im_hw[i]  # im, hw_original, hw_resized
 
     def cache_images_to_disk(self, i):
