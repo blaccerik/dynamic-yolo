@@ -163,5 +163,3 @@ Werkzeug==2.2.2
 widgetsnbextension==4.0.3
 WTForms==3.0.1
 zipp==3.10.0
-
-aiofiles~=23.1.0
