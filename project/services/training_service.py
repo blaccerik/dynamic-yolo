@@ -1,3 +1,4 @@
+import io
 import logging
 import os
 import shutil
@@ -6,6 +7,8 @@ import cv2
 import numpy as np
 import torch
 import yaml
+import asyncio
+import aiofiles
 from sqlalchemy import and_
 # from torch.cuda import OutOfMemoryError
 
@@ -26,42 +29,53 @@ from project.yolo.yolov5.utils.augmentations import letterbox
 from project.yolo.yolov5.utils.general import scale_boxes, xyxy2xywh
 
 
-def add_results_to_db(results, maps, model_id, subset_id, epoch=None) -> ModelResults:
-    metric_precision, metric_recall, metric_map_50, metric_map_50_95, val_box_loss, val_obj_loss, val_cls_loss = results
-
-    # # ap per class
-    # for index, value in enumerate(maps):
-    #     print(index, value)
-
-    # save results
-    mr = ModelResults()
-    if epoch is not None:
-        mr.epoch = epoch
-    mr.subset_id = subset_id
-    mr.model_id = model_id
-    mr.metric_precision = metric_precision
-    mr.metric_recall = metric_recall
-    mr.metric_map_50 = metric_map_50
-    mr.metric_map_50_95 = metric_map_50_95
-    mr.val_box_loss = val_box_loss
-    mr.val_obj_loss = val_obj_loss
-    mr.val_cls_loss = val_cls_loss
-    db.session.add(mr)
-    db.session.commit()
-
-    return mr
+# def add_results_to_db(results, maps, model_id, subset_id, epoch=None) -> ModelResults:
+#     metric_precision, metric_recall, metric_map_50, metric_map_50_95, val_box_loss, val_obj_loss, val_cls_loss = results
+#
+#     # # ap per class
+#     # for index, value in enumerate(maps):
+#     #     print(index, value)
+#
+#     # save results
+#     mr = ModelResults()
+#     if epoch is not None:
+#         mr.epoch = epoch
+#     mr.subset_id = subset_id
+#     mr.model_id = model_id
+#     mr.metric_precision = metric_precision
+#     mr.metric_recall = metric_recall
+#     mr.metric_map_50 = metric_map_50
+#     mr.metric_map_50_95 = metric_map_50_95
+#     mr.val_box_loss = val_box_loss
+#     mr.val_obj_loss = val_obj_loss
+#     mr.val_cls_loss = val_cls_loss
+#     db.session.add(mr)
+#     db.session.commit()
+#
+#     return mr
 
 class SqlStream:
 
-    def __init__(self, project_id, project_settings, ss_train_id):
+    def __init__(self, project_id, project_settings, ss_train_id, ss_test_id, db_model):
         self.project_id = project_id
         self.project_settings = project_settings
         self.ss_train_id = ss_train_id
+        self.ss_test_id = ss_test_id
+        self.db_model = db_model
+
+        self.best = None
 
         # yolo dataloader
         self.img_size = [640, 640]
         self.stride = 32
         self.auto = True
+
+
+    def save_best(self, ckpt):
+
+        buffer = io.BytesIO()
+        torch.save(ckpt, buffer)
+        self.best = buffer.getvalue()
 
     def get_all_train_images(self):
         images = Image.query.filter(and_(
@@ -84,6 +98,35 @@ class SqlStream:
             c += 1
             if c == 1:
                 break
+
+    def add_results_to_db(self, results, maps, subset, epoch=None):
+        if subset == "train":
+            subset_id = self.ss_train_id
+        elif subset == "test":
+            subset_id = self.ss_test_id
+        metric_precision, metric_recall, metric_map_50, metric_map_50_95, val_box_loss, val_obj_loss, val_cls_loss = results
+
+        # # ap per class
+        # for index, value in enumerate(maps):
+        #     print(index, value)
+
+        # save results
+        mr = ModelResults()
+        if epoch is not None:
+            mr.epoch = epoch
+        mr.subset_id = subset_id
+        mr.model_id = self.db_model.id
+        mr.metric_precision = metric_precision
+        mr.metric_recall = metric_recall
+        mr.metric_map_50 = metric_map_50
+        mr.metric_map_50_95 = metric_map_50_95
+        mr.val_box_loss = val_box_loss
+        mr.val_obj_loss = val_obj_loss
+        mr.val_cls_loss = val_cls_loss
+        db.session.add(mr)
+        db.session.commit()
+
+        return mr
 
     def normalize_preds(self, pred, im0, im):
         for i, det in enumerate(pred):  # per image
@@ -141,9 +184,9 @@ class TrainSession:
                 total = prev_model.total_epochs
                 self.new_model = False
                 self.db_model.parent_model_id = prev_model_id
-
-                with open(f"{APP_ROOT_PATH}/yolo/data/weights.pt", "wb") as binary_file:
-                    binary_file.write(self.prev_model)
+                #
+                # with open(f"{APP_ROOT_PATH}/yolo/data/weights.pt", "wb") as binary_file:
+                #     binary_file.write(self.prev_model)
         else:
             self.new_model = True
 
@@ -165,6 +208,8 @@ class TrainSession:
             self.yaml = yaml_file
             with open(f'{APP_ROOT_PATH}/yolo/data/backbone.yaml', 'w') as outfile:
                 yaml.dump(yaml_file, outfile, default_flow_style=False)
+
+        self.stream = SqlStream(self.project.id, self.project_settings, self.ss_train_id, self.ss_test_id, self.db_model)
 
 
 
@@ -212,8 +257,7 @@ class TrainSession:
         setattr(opt, "binary_weights", self.prev_model)
 
         # load sql stream
-        stream = SqlStream(self.project.id, self.project_settings, self.ss_train_id)
-        setattr(opt, "sql_stream", stream)
+        setattr(opt, "sql_stream", self.stream)
 
         # run model
         detect.main(opt)
@@ -255,20 +299,22 @@ class TrainSession:
         with open(f'{APP_ROOT_PATH}/yolo/data/data.yaml', 'w') as outfile:
             yaml.dump(data, outfile, default_flow_style=False)
 
+
     def load_data(self):
 
         # get images
         # todo only select images with certain timestamp
         images = Image.query.filter(Image.project_id == self.project.id)
 
+
         # filter out "good" images
         # images = [image for image in images if image.id not in self.good_images]
         # print(len(images), len(self.good_images))
-        has_train = 0
+        has_train = False
         has_test = False
-        for image in images.yield_per(DB_READ_BATCH_SIZE):
 
-            if has_test and has_train >= 10000:
+        for image in images.yield_per(DB_READ_BATCH_SIZE):
+            if has_train and has_test:
                 break
 
             # skip confident images
@@ -276,24 +322,23 @@ class TrainSession:
                 continue
 
             if image.subset_id == self.ss_train_id:
-                if has_train >= 10000:
-                    continue
+                # if has_train:
+                #     continue
+                # has_train = True
                 location = f"{APP_ROOT_PATH}/yolo/data/train"
-                has_train += 1
             elif image.subset_id == self.ss_test_id:
-                if has_test:
-                    continue
+                # if has_test:
+                #     continue
+                # has_test = True
                 location = f"{APP_ROOT_PATH}/yolo/data/test"
-                has_test = True
             else:
                 print(image.subset_id, self.ss_train_id, self.ss_test_id)
                 raise RuntimeError("subset id not found")
-            # print(image)
+
             # save image
             content = image.image
             with open(f"{location}/images/{image.id}.png", "wb") as binary_file:
                 binary_file.write(content)
-
 
             annotations = Annotation.query.filter_by(project_id=self.project.id, image_id=image.id)
             text = ""
@@ -349,13 +394,11 @@ class TrainSession:
             setattr(opt, "cfg", "")
 
         # add model id to opt
-        setattr(opt, "db_model_id", self.db_model.id)
-        setattr(opt, "db_train_subset_id", self.ss_train_id)
-
-        stream = SqlStream(self.project.id, self.project_settings, self.ss_train_id)
+        # setattr(opt, "db_model_id", self.db_model.id)
+        # setattr(opt, "db_train_subset_id", self.ss_train_id)
 
         try:
-            train.main(opt, binary_weights=self.prev_model, yaml_dict=self.yaml, sql_stream=stream)  # long process
+            train.main(opt, binary_weights=self.prev_model, yaml_dict=self.yaml, sql_stream=self.stream)  # long process
         except torch.cuda.OutOfMemoryError as e:
             print("out of gpu memory")
             print(e)
@@ -371,10 +414,11 @@ class TrainSession:
             db.session.commit()
             return True
 
-        # read model weights
-        with open(f"{APP_ROOT_PATH}/yolo/data/model/yolo_train/weights/best.pt", "rb") as f:
-            content = f.read()
-            self.db_model.model = content
+        # # read model weights
+        # with open(f"{APP_ROOT_PATH}/yolo/data/model/yolo_train/weights/best.pt", "rb") as f:
+        #     content = f.read()
+        #     self.db_model.model = content
+        self.db_model.model = self.stream.best
         return False
 
     def test(self):
@@ -405,6 +449,8 @@ class TrainSession:
         # setattr(opt, "save_txt", True)
         # setattr(opt, "save_conf", True)
 
+        setattr(opt, "binary_weights", self.stream.best)
+
         # run model
         # todo dont save results
         settings = vars(opt)
@@ -415,7 +461,8 @@ class TrainSession:
             db.session.add(self.db_model)
             db.session.commit()
             return True
-        mr = add_results_to_db(results, maps, self.db_model.id, self.ss_test_id)
+        mr = self.stream.add_results_to_db(results, maps, "test")
+        # mr = add_results_to_db(results, maps, self.db_model.id, self.ss_test_id)
         # t holds speeds per image, [a, b, c]
         # a - init time
         # b - inference time
@@ -519,7 +566,6 @@ def start_training(project: Project) -> bool:
     print("ts 3")
     ts.pretest()
     print("ts 4")
-    # return False
     ts.load_yaml()
     print("ts 5")
     ts.load_data()
@@ -529,7 +575,6 @@ def start_training(project: Project) -> bool:
         print("Out of memory while training")
         return True
     print("ts 7")
-    # return False
     error = ts.test()
     if error:
         print("Out of memory while testing")

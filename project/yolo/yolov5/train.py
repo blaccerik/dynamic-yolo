@@ -60,7 +60,6 @@ from utils.metrics import fitness
 from utils.plots import plot_evolve
 from utils.torch_utils import (EarlyStopping, ModelEMA, de_parallel, select_device, smart_DDP, smart_optimizer,
                                smart_resume, torch_distributed_zero_first)
-from project.services.training_service import add_results_to_db
 
 LOCAL_RANK = int(os.getenv('LOCAL_RANK', -1))  # https://pytorch.org/docs/stable/elastic/run.html
 RANK = int(os.getenv('RANK', -1))
@@ -72,10 +71,7 @@ def train(hyp, opt, device, callbacks, binary_weights=None, yaml_dict=None, sql_
     save_dir, epochs, batch_size, weights, single_cls, evolve, data, cfg, resume, noval, nosave, workers, freeze = \
         Path(opt.save_dir), opt.epochs, opt.batch_size, opt.weights, opt.single_cls, opt.evolve, opt.data, opt.cfg, \
         opt.resume, opt.noval, opt.nosave, opt.workers, opt.freeze
-
-    # print("train resume", resume)
     callbacks.run('on_pretrain_routine_start')
-
     # Directories
     w = save_dir / 'weights'  # weights dir
     (w.parent if evolve else w).mkdir(parents=True, exist_ok=True)  # make dir
@@ -104,14 +100,13 @@ def train(hyp, opt, device, callbacks, binary_weights=None, yaml_dict=None, sql_
         data_dict = loggers.remote_dataset
         if resume:  # If resuming runs from remote artifact
             weights, epochs, hyp, batch_size = opt.weights, opt.epochs, opt.hyp, opt.batch_size
+    # print(os.listdir("/home/erik/PycharmProjects/dynamic-yolo/project/yolo/data/model/yolo_train"))
     # Config
     plots = not evolve and not opt.noplots  # create plots
     cuda = device.type != 'cpu'
     init_seeds(opt.seed + 1 + RANK, deterministic=True)
-    # print(data)
     with torch_distributed_zero_first(LOCAL_RANK):
         data_dict = data_dict or check_dataset(data)  # check if None
-    # print("data_dict", data_dict)
     train_path, val_path = data_dict['train'], data_dict['val']
     nc = 1 if single_cls else int(data_dict['nc'])  # number of classes
     names = {0: 'item'} if single_cls and len(data_dict['names']) != 1 else data_dict['names']  # class names
@@ -120,12 +115,9 @@ def train(hyp, opt, device, callbacks, binary_weights=None, yaml_dict=None, sql_
     # Model
     check_suffix(weights, '.pt')  # check weights
     pretrained = weights.endswith('.pt')
-    # print("train pretrained", pretrained)
-    # print("train cfg", cfg)
     if pretrained:
         with torch_distributed_zero_first(LOCAL_RANK):
             weights = attempt_download(weights)  # download if not found locally
-        # print(weights)
         if binary_weights is None:
             ckpt = torch.load(weights, map_location='cpu')  # load checkpoint to CPU to avoid CUDA memory leak
         else:
@@ -142,7 +134,6 @@ def train(hyp, opt, device, callbacks, binary_weights=None, yaml_dict=None, sql_
             model = Model(cfg, ch=3, nc=nc, anchors=hyp.get('anchors')).to(device)  # create
         else:
             model = Model(yaml_dict, ch=3, nc=nc, anchors=hyp.get('anchors')).to(device)  # create
-    # print(model)
     amp = check_amp(model)  # check AMP
 
     # Freeze
@@ -181,13 +172,11 @@ def train(hyp, opt, device, callbacks, binary_weights=None, yaml_dict=None, sql_
 
     # Resume
     best_fitness, start_epoch = 0.0, 0
-    # print("train pretrained", pretrained)
     if pretrained:
         if resume:
             best_fitness, start_epoch, epochs = smart_resume(ckpt, optimizer, ema, weights, epochs, resume)
         del ckpt, csd
 
-    # print("train weights",weights)
 
     # DP mode
     if cuda and RANK == -1 and torch.cuda.device_count() > 1:
@@ -201,7 +190,6 @@ def train(hyp, opt, device, callbacks, binary_weights=None, yaml_dict=None, sql_
         LOGGER.info('Using SyncBatchNorm()')
 
     # Trainloader
-    # print(sql_stream)
     train_loader, dataset = create_dataloader(train_path,
                                               imgsz,
                                               batch_size // WORLD_SIZE,
@@ -216,9 +204,7 @@ def train(hyp, opt, device, callbacks, binary_weights=None, yaml_dict=None, sql_
                                               image_weights=opt.image_weights,
                                               quad=opt.quad,
                                               prefix=colorstr('train: '),
-                                              shuffle=True,
-                                              sql_stream=sql_stream)
-    # print("train", train_loader, dataset)
+                                              shuffle=True)
     labels = np.concatenate(dataset.labels, 0)
     mlc = int(labels[:, 0].max())  # max label class
     assert mlc < nc, f'Label class {mlc} exceeds nc={nc} in {data}. Possible class labels are 0-{nc - 1}'
@@ -245,8 +231,9 @@ def train(hyp, opt, device, callbacks, binary_weights=None, yaml_dict=None, sql_
             if not opt.noautoanchor:
                 check_anchors(dataset, model=model, thr=hyp['anchor_t'], imgsz=imgsz)  # run AutoAnchor
             model.half().float()  # pre-reduce anchor precision
-
+        # print(os.listdir("/home/erik/PycharmProjects/dynamic-yolo/project/yolo/data/model/yolo_train"))
         callbacks.run('on_pretrain_routine_end', labels, names)
+        # print(os.listdir("/home/erik/PycharmProjects/dynamic-yolo/project/yolo/data/model/yolo_train"))
 
     # DDP mode
     if cuda and RANK != -1:
@@ -265,8 +252,6 @@ def train(hyp, opt, device, callbacks, binary_weights=None, yaml_dict=None, sql_
 
     # Start training
     t0 = time.time()
-    db_model_id = opt.db_model_id
-    db_train_subset_id = opt.db_train_subset_id
     nb = len(train_loader)  # number of batches
     nw = max(round(hyp['warmup_epochs'] * nb), 100)  # number of warmup iterations, max(3 epochs, 100 iterations)
     # nw = min(nw, (epochs - start_epoch) / 2 * nb)  # limit warmup to < 1/2 of training
@@ -283,7 +268,6 @@ def train(hyp, opt, device, callbacks, binary_weights=None, yaml_dict=None, sql_
                 f"Logging results to {colorstr('bold', save_dir)}\n"
                 f'Starting training for {epochs} epochs...')
     for epoch in range(start_epoch, epochs):  # epoch ------------------------------------------------------------------
-        # print("epoch", epoch)
 
         callbacks.run('on_train_epoch_start')
         model.train()
@@ -303,7 +287,6 @@ def train(hyp, opt, device, callbacks, binary_weights=None, yaml_dict=None, sql_
             train_loader.sampler.set_epoch(epoch)
         pbar = enumerate(train_loader)
 
-        # print(pbar)
 
         LOGGER.info(('\n' + '%11s' * 7) % ('Epoch', 'GPU_mem', 'box_loss', 'obj_loss', 'cls_loss', 'Instances', 'Size'))
         if RANK in {-1, 0}:
@@ -388,7 +371,8 @@ def train(hyp, opt, device, callbacks, binary_weights=None, yaml_dict=None, sql_
                                                 plots=False,
                                                 callbacks=callbacks,
                                                 compute_loss=compute_loss)
-                add_results_to_db(results, maps, db_model_id, db_train_subset_id, epoch=epoch)
+                if sql_stream:
+                    sql_stream.add_results_to_db(results, maps, "train", epoch)
 
 
             # Update best mAP
@@ -397,8 +381,10 @@ def train(hyp, opt, device, callbacks, binary_weights=None, yaml_dict=None, sql_
             if fi > best_fitness:
                 best_fitness = fi
             log_vals = list(mloss) + list(results) + lr
-            callbacks.run('on_fit_epoch_end', log_vals, epoch, best_fitness, fi)
-
+            # print(os.listdir("/home/erik/PycharmProjects/dynamic-yolo/project/yolo/data/model/yolo_train"))
+            if not sql_stream:
+                callbacks.run('on_fit_epoch_end', log_vals, epoch, best_fitness, fi)
+            # print(os.listdir("/home/erik/PycharmProjects/dynamic-yolo/project/yolo/data/model/yolo_train"))
             # Save model
             if (not nosave) or (final_epoch and not evolve):  # if save
                 ckpt = {
@@ -411,13 +397,16 @@ def train(hyp, opt, device, callbacks, binary_weights=None, yaml_dict=None, sql_
                     'opt': vars(opt),
                     'git': GIT_INFO,  # {remote, branch, commit} if a git repo
                     'date': datetime.now().isoformat()}
-
-                # Save last, best and delete
-                torch.save(ckpt, last)
-                if best_fitness == fi:
-                    torch.save(ckpt, best)
-                if opt.save_period > 0 and epoch % opt.save_period == 0:
-                    torch.save(ckpt, w / f'epoch{epoch}.pt')
+                if sql_stream:
+                    if best_fitness == fi:
+                        sql_stream.save_best(ckpt)
+                else:
+                    # Save last, best and delete
+                    torch.save(ckpt, last)
+                    if best_fitness == fi:
+                        torch.save(ckpt, best)
+                    if opt.save_period > 0 and epoch % opt.save_period == 0:
+                        torch.save(ckpt, w / f'epoch{epoch}.pt')
                 del ckpt
                 callbacks.run('on_model_save', last, epoch, final_epoch, best_fitness, fi)
 
@@ -514,9 +503,7 @@ def main(opt, callbacks=Callbacks(), binary_weights=None, yaml_dict=None, sql_st
         print_args(vars(opt))
         check_git_status()
         check_requirements()
-    # print(opt.cache)
     # Resume (from specified or most recent last.pt)
-    # print(opt.resume, not check_comet_resume(opt), not opt.evolve)
     if opt.resume and not check_comet_resume(opt) and not opt.evolve:
         last = Path(check_file(opt.resume) if isinstance(opt.resume, str) else get_latest_run())
         opt_yaml = last.parent.parent / 'opt.yaml'  # train options yaml
