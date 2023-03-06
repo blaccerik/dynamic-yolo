@@ -7,26 +7,25 @@ import cv2
 import numpy as np
 import torch
 import yaml
-import asyncio
-import aiofiles
 from sqlalchemy import and_
-# from torch.cuda import OutOfMemoryError
 
 from project import db, APP_ROOT_PATH
 from project.models.annotation import Annotation
 from project.models.image import Image
 from project.models.image_class import ImageClass
-from project.models.model_status import ModelStatus
-from project.models.subset import Subset
 from project.models.initial_model import InitialModel
 from project.models.model import Model
 from project.models.model_image import ModelImage
 from project.models.model_results import ModelResults
-from project.models.project_status import ProjectStatus
+from project.models.model_status import ModelStatus
 from project.models.project import Project
 from project.models.project_settings import ProjectSettings
+from project.models.subset import Subset
 from project.yolo.yolov5.utils.augmentations import letterbox
 from project.yolo.yolov5.utils.general import scale_boxes, xyxy2xywh
+
+
+# from torch.cuda import OutOfMemoryError
 
 
 # def add_results_to_db(results, maps, model_id, subset_id, epoch=None) -> ModelResults:
