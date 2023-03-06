@@ -2,11 +2,15 @@
 .git/**/*
 gen
 gen/**/*
-docker
 tests
 tests/**/*
+docker
+__pycache__
+__pycache/**/*
 **/prototype
 **/prototype/**/*
+project/yolo/data
+project/yolo/data/**/*
 prototype
 prototype/**/*
 venv

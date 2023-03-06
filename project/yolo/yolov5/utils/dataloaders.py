@@ -278,7 +278,6 @@ class LoadImages:
         if self.count == self.nf:
             raise StopIteration
         path = self.files[self.count]
-
         if self.video_flag[self.count]:
             # Read video
             self.mode = 'video'
@@ -650,8 +649,8 @@ class LoadImagesAndLabels(Dataset):
     #     return self
 
     def __getitem__(self, index):
+        # print("dataloader get", index)
         index = self.indices[index]  # linear, shuffled, or image_weights
-
         hyp = self.hyp
         mosaic = self.mosaic and random.random() < hyp['mosaic']
         if mosaic:
@@ -726,10 +725,13 @@ class LoadImagesAndLabels(Dataset):
     def load_image(self, i):
         # Loads 1 image from dataset index 'i', returns (im, original hw, resized hw)
         im, f, fn = self.ims[i], self.im_files[i], self.npy_files[i],
+        # print(i, im, f ,fn)
         if im is None:  # not cached in RAM
             if fn.exists():  # load npy
                 im = np.load(fn)
+                print(f"exists {fn}")
             else:  # read image
+                # print(f"{i} read")
                 im = cv2.imread(f)  # BGR
                 assert im is not None, f'Image Not Found {f}'
             h0, w0 = im.shape[:2]  # orig hw
@@ -738,6 +740,7 @@ class LoadImagesAndLabels(Dataset):
                 interp = cv2.INTER_LINEAR if (self.augment or r > 1) else cv2.INTER_AREA
                 im = cv2.resize(im, (int(w0 * r), int(h0 * r)), interpolation=interp)
             return im, (h0, w0), im.shape[:2]  # im, hw_original, hw_resized
+        # print(f"{i} cache")
         return self.ims[i], self.im_hw0[i], self.im_hw[i]  # im, hw_original, hw_resized
 
     def cache_images_to_disk(self, i):

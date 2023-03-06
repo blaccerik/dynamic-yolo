@@ -59,8 +59,7 @@ def get_project_info(project_code: int):
         Subset.id == train_subset_id,
         Annotation.project_id == project_code
     )).count()
-
-    total_models_in_project = len(project.models)
+    total_models_in_project = Model.query.filter(Model.project_id==project_code).count()
 
     m = Model.query.get(project.latest_model_id)
     if m is None:

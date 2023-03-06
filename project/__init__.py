@@ -2,6 +2,7 @@ import atexit
 import os
 import pathlib
 
+import werkzeug
 from apscheduler.schedulers.background import BackgroundScheduler
 from flask import Flask, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
@@ -9,8 +10,18 @@ from flask_swagger_ui import get_swaggerui_blueprint
 from werkzeug.serving import is_running_from_reloader
 import torch
 
-print(torch.cuda.is_available())
-print(torch.cuda.get_device_name(0))
+if torch.cuda.is_available():
+    print(torch.cuda.get_device_name(0))
+else:
+    print("no gpu/cuda found")
+
+import resource
+
+# max_data_memory = int(os.getenv('RLIMIT_DATA', -1))
+# resource.setrlimit(resource.RLIMIT_DATA, (max_data_memory, max_data_memory))
+# in .env file
+# RLIMIT_DATA=2636870912 # 2.6gb
+
 
 db = SQLAlchemy()
 
@@ -34,6 +45,9 @@ def create_app(config_filename=None):
     # Create the Flask application
     app = Flask(__name__)
 
+    # needs to be before config or else cant tell if in reloader
+    activate_queue = not app.debug or (app.debug and is_running_from_reloader())
+
     if config_filename is not None:
         app.config.from_object(config_filename)
     else:
@@ -45,7 +59,7 @@ def create_app(config_filename=None):
     register_cli_commands(app)
     init_swagger(app)
 
-    if not is_running_from_reloader():
+    if activate_queue:
         from project.services.queue_service import update_queue
 
         scheduler = BackgroundScheduler(job_defaults={'max_instances': 2})
