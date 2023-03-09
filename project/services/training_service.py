@@ -129,7 +129,6 @@ class SqlStream:
                     # todo use these results to pick bad images
         if len(predictions) != len(annotations):
             return
-        threshold = 0.05
         for x, y, w, h, conf, class_nr in predictions:
             closest_ano = min(annotations, key=lambda a: self.distance(a, x, y))
             if class_nr != closest_ano.class_id:
@@ -138,9 +137,9 @@ class SqlStream:
             h_diff = abs(h - closest_ano.height)
             # print(f"{x:.3f} {y:.3f} {w:.3f} {h:.3f}")
             # print(f"{closest_ano.x_center:.3f} {closest_ano.y_center:.3f} {closest_ano.width:.3f} {closest_ano.height:.3f}")
-            if w_diff > threshold:
+            if w_diff > self.project_settings.pretest_size_difference_threshold:
                 break
-            elif h_diff > threshold:
+            elif h_diff > self.project_settings.pretest_size_difference_threshold:
                 break
         else:
             self.good_images.add(image_id)
@@ -429,18 +428,26 @@ class TrainSession:
             db.session.commit()
             return True
         mr = self.stream.add_results_to_db(results, maps, "test")
-        # mr = add_results_to_db(results, maps, self.db_model.id, self.ss_test_id)
         # t holds speeds per image, [a, b, c]
         # a - init time
         # b - inference time
         # c - nms time
 
         print(mr.metric_precision, mr.metric_recall, mr.metric_map_50, mr.metric_map_50_95)
+        db.session.refresh(self.project)
+        if self.project.times_auto_trained >= self.project_settings.maximum_auto_train_number:
+            return False
+
+        from project.services.queue_service import add_to_queue  # avoid circular import
 
         # see if model needs to be retrained
-        if mr.metric_map_50 < self.project_settings.minimal_map_50_threshold:
-            from project.services.queue_service import add_to_queue  # avoid circular import
-            add_to_queue(self.project.id)
+        needs_auto_train = mr.metric_map_50 < self.project_settings.minimal_map_50_threshold or \
+                           mr.metric_map_50_95 < self.project_settings.minimal_map_50_95_threshold or \
+                           mr.metric_recall < self.project_settings.minimal_map_recall_threshold or \
+                           mr.metric_precision < self.project_settings.minimal_map_recall_threshold
+
+        if needs_auto_train:
+            add_to_queue(self.project.id, "retrain")
         return False
 
     def cleanup(self):
@@ -450,6 +457,7 @@ class TrainSession:
         # update model
         self.db_model.model_status_id = self.ms_ready.id
         self.project.latest_model_id = self.db_model.id
+        self.project.times_auto_trained += 1
         db.session.add(self.db_model)
         db.session.add(self.project)
         db.session.commit()
@@ -538,16 +546,16 @@ def start_training(project: Project) -> bool:
     print("ts 5")
     ts.load_data()
     print("ts 6")
-    # error = ts.train()
-    # if error:
-    #     print("Out of memory while training")
-    #     return True
+    error = ts.train()
+    if error:
+        print("Out of memory while training")
+        return True
     print("ts 7")
     error = ts.test()
     if error:
         print("Out of memory while testing")
         return True
     print("ts 8")
-    # ts.cleanup()
+    ts.cleanup()
     return False
 
