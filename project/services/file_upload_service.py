@@ -164,7 +164,7 @@ def upload_files(files: list, project_code: int, uploader: str, split: str) -> (
     failed_images_number, _ = _upload_images(failed_images, unknown_project.id, annotator.id, ratio, split)
 
     # add to queue
-    add_to_queue(project.id)
+    add_to_queue(project.id, "upload")
     return passed_images_number, failed_images_number, annotations_number
 
 

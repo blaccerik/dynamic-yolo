@@ -19,7 +19,7 @@ def get_queue():
 @REQUEST_API.route('/', methods=['POST'])
 def add_project_to_queue():
     project_id = request.json.get('project_id')
-    message, error = add_to_queue(project_id)
+    message, error = add_to_queue(project_id, "retrain")
 
     if error == 1:
         return jsonify({'error': message}), 404
