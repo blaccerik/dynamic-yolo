@@ -20,6 +20,9 @@ class ProjectSettings(db.Model):
     img_size = Column(Integer, nullable=False, default=640)
     initial_model_id = Column(Integer, ForeignKey("initial_model.id"), nullable=False, default=get_default_name_id)
     confidence_threshold = Column(Float, nullable=False, default=0.95) # how confident model needs to be to skip image
+
+
+
     train_test_ratio = Column(Float, nullable=False, default=0.75)
     minimal_map_50_threshold = Column(Float, nullable=False, default=0)
 

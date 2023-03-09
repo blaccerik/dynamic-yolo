@@ -120,7 +120,7 @@ def run(
     seen, windows, dt = 0, [], (Profile(), Profile(), Profile())
 
     if sql_stream is not None:
-        for im, im0 in sql_stream.get_all_train_images():
+        for im, im0, image_id in sql_stream.get_all_train_images():
 
             with dt[0]:
                 im = torch.from_numpy(im).to(model.device)
@@ -138,7 +138,7 @@ def run(
                 pred = non_max_suppression(pred, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)
 
             # preds
-            sql_stream.normalize_preds(pred, im0, im)
+            sql_stream.normalize_preds(pred, im0, im, image_id)
     else:
         for path, im, im0s, vid_cap, s in dataset:
             with dt[0]:
