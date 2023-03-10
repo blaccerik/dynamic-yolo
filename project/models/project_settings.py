@@ -1,6 +1,6 @@
 from select import select
 
-from sqlalchemy import VARCHAR, Column, BigInteger, ForeignKey, Integer, Float, text
+from sqlalchemy import VARCHAR, Column, BigInteger, ForeignKey, Integer, Float, text, Boolean
 from sqlalchemy.orm import relationship
 
 from project import db
@@ -19,9 +19,16 @@ class ProjectSettings(db.Model):
     batch_size = Column(Integer, nullable=False, default=8)
     img_size = Column(Integer, nullable=False, default=640)
     initial_model_id = Column(Integer, ForeignKey("initial_model.id"), nullable=False, default=get_default_name_id)
-    confidence_threshold = Column(Float, nullable=False, default=0.95) # how confident model needs to be to skip image
+
     train_test_ratio = Column(Float, nullable=False, default=0.75)
+    pretest_size_difference_threshold = Column(Float, nullable=False, default=0.05)
+    maximum_auto_train_number = Column(Integer, nullable=False, default=3)
+    skip_pretesting = Column(Boolean, nullable=False, default=False)
+
     minimal_map_50_threshold = Column(Float, nullable=False, default=0)
+    minimal_map_50_95_threshold = Column(Float, nullable=False, default=0)
+    minimal_precision_threshold = Column(Float, nullable=False, default=0)
+    minimal_recall_threshold = Column(Float, nullable=False, default=0)
 
     # min confidence for model to read image section as detection
     min_confidence_threshold = Column(Float, nullable=False, default=0.25)

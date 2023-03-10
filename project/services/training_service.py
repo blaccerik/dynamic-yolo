@@ -1,5 +1,6 @@
 import io
 import logging
+import math
 import os
 import shutil
 
@@ -9,7 +10,7 @@ import torch
 import yaml
 from sqlalchemy import and_
 
-from project import db, APP_ROOT_PATH
+from project import db, APP_ROOT_PATH, DB_READ_BATCH_SIZE, NUMBER_OF_YOLO_WORKERS
 from project.models.annotation import Annotation
 from project.models.image import Image
 from project.models.image_class import ImageClass
@@ -24,35 +25,6 @@ from project.models.subset import Subset
 from project.yolo.yolov5.utils.augmentations import letterbox
 from project.yolo.yolov5.utils.general import scale_boxes, xyxy2xywh
 
-
-# from torch.cuda import OutOfMemoryError
-
-
-# def add_results_to_db(results, maps, model_id, subset_id, epoch=None) -> ModelResults:
-#     metric_precision, metric_recall, metric_map_50, metric_map_50_95, val_box_loss, val_obj_loss, val_cls_loss = results
-#
-#     # # ap per class
-#     # for index, value in enumerate(maps):
-#     #     print(index, value)
-#
-#     # save results
-#     mr = ModelResults()
-#     if epoch is not None:
-#         mr.epoch = epoch
-#     mr.subset_id = subset_id
-#     mr.model_id = model_id
-#     mr.metric_precision = metric_precision
-#     mr.metric_recall = metric_recall
-#     mr.metric_map_50 = metric_map_50
-#     mr.metric_map_50_95 = metric_map_50_95
-#     mr.val_box_loss = val_box_loss
-#     mr.val_obj_loss = val_obj_loss
-#     mr.val_cls_loss = val_cls_loss
-#     db.session.add(mr)
-#     db.session.commit()
-#
-#     return mr
-
 class SqlStream:
 
     def __init__(self, project_id, project_settings, ss_train_id, ss_test_id, db_model):
@@ -63,6 +35,7 @@ class SqlStream:
         self.db_model = db_model
 
         self.best = None
+        self.good_images = set()
 
         # yolo dataloader
         self.img_size = [640, 640]
@@ -93,9 +66,9 @@ class SqlStream:
             im = im.transpose((2, 0, 1))[::-1]  # HWC to CHW, BGR to RGB
             im = np.ascontiguousarray(im)  # contiguous
 
-            yield im, im0
+            yield im, im0, image.id
             c += 1
-            if c == 1:
+            if c == 10000:
                 break
 
     def add_results_to_db(self, results, maps, subset, epoch=None):
@@ -127,7 +100,18 @@ class SqlStream:
 
         return mr
 
-    def normalize_preds(self, pred, im0, im):
+    def distance(self, p1: Annotation, x, y):
+        """Calculate the Euclidean distance between two points"""
+        return math.sqrt((p1.x_center - x) ** 2 + (p1.y_center - y) ** 2)
+
+    def normalize_preds(self, pred, im0, im, image_id):
+
+        annotations = Annotation.query.filter(and_(
+            Annotation.project_id == self.project_id,
+            Annotation.image_id == image_id
+        )).all()
+
+        predictions = []
         for i, det in enumerate(pred):  # per image
             gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
             if len(det):
@@ -140,16 +124,30 @@ class SqlStream:
                     class_nr = cls.item()
                     x, y, w, h = xywh
                     conf = conf.item()
-                    # print(class_nr, x,y,w,h,conf)
+                    predictions.append((x,y,w,h,conf,int(class_nr)))
 
                     # todo use these results to pick bad images
+        if len(predictions) != len(annotations):
+            return
+        for x, y, w, h, conf, class_nr in predictions:
+            closest_ano = min(annotations, key=lambda a: self.distance(a, x, y))
+            if class_nr != closest_ano.class_id:
+                break
+            w_diff = abs(w - closest_ano.width)
+            h_diff = abs(h - closest_ano.height)
+            # print(f"{x:.3f} {y:.3f} {w:.3f} {h:.3f}")
+            # print(f"{closest_ano.x_center:.3f} {closest_ano.y_center:.3f} {closest_ano.width:.3f} {closest_ano.height:.3f}")
+            if w_diff > self.project_settings.pretest_size_difference_threshold:
+                break
+            elif h_diff > self.project_settings.pretest_size_difference_threshold:
+                break
+        else:
+            self.good_images.add(image_id)
 
 
 # needs to be here to avoid circular import error
 from project.yolo.yolov5 import val, train, detect
 
-
-DB_READ_BATCH_SIZE = 32
 
 class TrainSession:
     def __init__(self, project: Project,
@@ -211,25 +209,6 @@ class TrainSession:
         self.stream = SqlStream(self.project.id, self.project_settings, self.ss_train_id, self.ss_test_id, self.db_model)
 
 
-
-    def load_pretest(self):
-        if self.new_model:
-            return
-
-        # # todo use db stream and dont write to disk
-        # images = Image.query.filter(and_(
-        #     Image.project_id == self.project.id
-        #     # Image.subset_id == self.ss_train_id
-        # ))
-        # c = 0
-        # for image in images.yield_per(self.project_settings.batch_size):
-        #     content = image.image
-        #     with open(f"{APP_ROOT_PATH}/yolo/data/pretest_images/{image.id}.png", "wb") as binary_file:
-        #         binary_file.write(content)
-        #     c += 1
-        #     if c == 1:
-        #         break
-
     def pretest(self):
         if self.new_model:
             return
@@ -242,9 +221,9 @@ class TrainSession:
 
         setattr(opt, "weights", f"{APP_ROOT_PATH}/yolo/data/weights.pt")
         setattr(opt, "source", f"{APP_ROOT_PATH}/yolo/data/pretest_images")
-        setattr(opt, "nosave", True)
-        setattr(opt, "save_txt", True)
-        setattr(opt, "save_conf", True)
+        # setattr(opt, "nosave", True)
+        # setattr(opt, "save_txt", True)
+        # setattr(opt, "save_conf", True)
         setattr(opt, "conf_thres", self.project_settings.min_confidence_threshold)
         setattr(opt, "iou_thres", self.project_settings.min_iou_threshold)
         setattr(opt, "imgsz", [self.project_settings.img_size, self.project_settings.img_size])
@@ -260,22 +239,6 @@ class TrainSession:
 
         # run model
         detect.main(opt)
-
-        # # read results
-        # for path in os.listdir(f"{APP_ROOT_PATH}/yolo/data/pretest_results/yolo_test/labels"):
-        #     self._read_file(path)
-
-    # def _read_file(self, path):
-    #     image_file = os.path.join(f"{APP_ROOT_PATH}/yolo/data/pretest_results/yolo_test/labels", path)
-    #     with open(image_file, "r") as f:
-    #         for line in f.readlines():
-    #             class_nr, _, _, _, _, conf = line.strip().split(" ")
-    #             conf = float(conf)
-    #             if conf < self.project_settings.confidence_threshold:
-    #                 return
-    #         nr, _ = path.split(".")
-    #         nr = int(nr)
-    #         self.good_images.add(nr)
 
     def load_yaml(self):
         # create yaml file
@@ -298,20 +261,18 @@ class TrainSession:
         with open(f'{APP_ROOT_PATH}/yolo/data/data.yaml', 'w') as outfile:
             yaml.dump(data, outfile, default_flow_style=False)
 
-
     def load_data(self):
 
         # get images
         # todo only select images with certain timestamp
+        # todo resize image to correct size
         images = Image.query.filter(Image.project_id == self.project.id)
 
 
         # filter out "good" images
-        # images = [image for image in images if image.id not in self.good_images]
-        # print(len(images), len(self.good_images))
         has_train = False
         has_test = False
-
+        print("skipping", len(self.stream.good_images))
         for image in images.yield_per(DB_READ_BATCH_SIZE):
             if has_train and has_test:
                 break
@@ -321,9 +282,11 @@ class TrainSession:
                 continue
 
             if image.subset_id == self.ss_train_id:
-                # if has_train:
-                #     continue
-                # has_train = True
+                if has_train:
+                    continue
+                has_train = True
+                if image.id in self.stream.good_images:
+                    continue
                 location = f"{APP_ROOT_PATH}/yolo/data/train"
             elif image.subset_id == self.ss_test_id:
                 # if has_test:
@@ -383,7 +346,7 @@ class TrainSession:
         # TODO add option for ram storage
         # setattr(opt, "cache", "ram")
         # setattr(opt, "cache", "disk")  # dont use disk cache, super slow
-        setattr(opt, "workers", 1)
+        setattr(opt, "workers", NUMBER_OF_YOLO_WORKERS)
 
         if self.new_model:
             setattr(opt, "weights", "")
@@ -438,6 +401,7 @@ class TrainSession:
         setattr(opt, "task", "test")
         setattr(opt, "project", f"{APP_ROOT_PATH}/yolo/data/results")
         setattr(opt, "name", "yolo_test")
+        setattr(opt, "workers", NUMBER_OF_YOLO_WORKERS)
 
         setattr(opt, "batch_size", self.project_settings.batch_size)
         setattr(opt, "imgsz", self.project_settings.img_size)
@@ -447,8 +411,11 @@ class TrainSession:
         # setattr(opt, "name", "yolo_test")
         # setattr(opt, "save_txt", True)
         # setattr(opt, "save_conf", True)
+        if self.stream.best is None:
+            setattr(opt, "binary_weights", self.prev_model)
+        else:
+            setattr(opt, "binary_weights", self.stream.best)
 
-        setattr(opt, "binary_weights", self.stream.best)
 
         # run model
         # todo dont save results
@@ -461,16 +428,26 @@ class TrainSession:
             db.session.commit()
             return True
         mr = self.stream.add_results_to_db(results, maps, "test")
-        # mr = add_results_to_db(results, maps, self.db_model.id, self.ss_test_id)
         # t holds speeds per image, [a, b, c]
         # a - init time
         # b - inference time
         # c - nms time
 
+        print(mr.metric_precision, mr.metric_recall, mr.metric_map_50, mr.metric_map_50_95)
+        db.session.refresh(self.project)
+        if self.project.times_auto_trained >= self.project_settings.maximum_auto_train_number:
+            return False
+
+        from project.services.queue_service import add_to_queue  # avoid circular import
+
         # see if model needs to be retrained
-        if mr.metric_map_50 < self.project_settings.minimal_map_50_threshold:
-            from project.services.queue_service import add_to_queue  # avoid circular import
-            add_to_queue(self.project.id)
+        needs_auto_train = mr.metric_map_50 < self.project_settings.minimal_map_50_threshold or \
+                           mr.metric_map_50_95 < self.project_settings.minimal_map_50_95_threshold or \
+                           mr.metric_recall < self.project_settings.minimal_recall_threshold or \
+                           mr.metric_precision < self.project_settings.minimal_recall_threshold
+
+        if needs_auto_train:
+            add_to_queue(self.project.id, False)
         return False
 
     def cleanup(self):
@@ -480,6 +457,7 @@ class TrainSession:
         # update model
         self.db_model.model_status_id = self.ms_ready.id
         self.project.latest_model_id = self.db_model.id
+        self.project.times_auto_trained += 1
         db.session.add(self.db_model)
         db.session.add(self.project)
         db.session.commit()
@@ -560,8 +538,6 @@ def start_training(project: Project) -> bool:
 
     print("ts 1")
     ts = TrainSession(project, project_settings, name, ss_test.id, ss_train.id)
-    print("ts 2")
-    ts.load_pretest()
     print("ts 3")
     ts.pretest()
     print("ts 4")

@@ -4,6 +4,9 @@ import os
 import requests
 import torch
 from flask import Blueprint
+
+from project import db
+from project.models.model import Model
 from project.models.project import Project
 from project.services.queue_service import add_to_queue, start_training
 from project.services.training_service import TrainSession
@@ -18,10 +21,15 @@ def hello_world():
 
 
 
-# @project.route('/hey')
-# def hello_world2():
-#     # link_images_and_annotations()
-#     return render_template("hello.html")
+@mod.route('/hey')
+def hello_world2():
+    # with open("model_27.pt", "br") as f:
+    #     a = f.read()
+    #     m = Model.query.get(2)
+    #     m.model = a
+    #     m.model_status_id = 2
+    #     db.session.commit()
+    return "eee"
 
 @mod.route('/train')
 def train():

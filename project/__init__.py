@@ -4,6 +4,7 @@ import pathlib
 
 import werkzeug
 from apscheduler.schedulers.background import BackgroundScheduler
+from dotenv import load_dotenv
 from flask import Flask, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from flask_swagger_ui import get_swaggerui_blueprint
@@ -27,6 +28,10 @@ db = SQLAlchemy()
 
 # /home/...../dynamic-yolo/project
 APP_ROOT_PATH = pathlib.Path(__file__).parent.resolve()
+
+load_dotenv()
+DB_READ_BATCH_SIZE = int(os.getenv("DB_READ_BATCH_SIZE"))
+NUMBER_OF_YOLO_WORKERS = int(os.getenv("NUMBER_OF_YOLO_WORKERS"))
 
 ### swagger specific ###
 SWAGGER_URL = '/swagger'
