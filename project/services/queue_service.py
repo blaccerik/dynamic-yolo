@@ -66,7 +66,7 @@ def update_queue(app):
         db.session.commit()
 
 
-def add_to_queue(project_id: int, reason: str):
+def add_to_queue(project_id: int, reset_counter=True):
     """
     Add project to query
     """
@@ -85,12 +85,10 @@ def add_to_queue(project_id: int, reason: str):
     q = Queue(position=position + 1, project_id=project.id)
     db.session.add(q)
 
-    if reason == "upload":
+    if reset_counter:
         db.session.refresh(project)
         project.times_auto_trained = 0
         db.session.add(project)
-    # else:
-    #     raise RuntimeError("unknown reason")
 
     db.session.commit()
 
