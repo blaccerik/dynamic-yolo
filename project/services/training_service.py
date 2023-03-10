@@ -12,10 +12,12 @@ from sqlalchemy import and_
 
 from project import db, APP_ROOT_PATH, DB_READ_BATCH_SIZE, NUMBER_OF_YOLO_WORKERS
 from project.models.annotation import Annotation
+from project.models.annotation_extra import AnnotationExtra
 from project.models.image import Image
 from project.models.image_class import ImageClass
 from project.models.initial_model import InitialModel
 from project.models.model import Model
+from project.models.model_class_results import ModelClassResult
 from project.models.model_image import ModelImage
 from project.models.model_results import ModelResults
 from project.models.model_status import ModelStatus
@@ -78,10 +80,6 @@ class SqlStream:
             subset_id = self.ss_test_id
         metric_precision, metric_recall, metric_map_50, metric_map_50_95, val_box_loss, val_obj_loss, val_cls_loss = results
 
-        # # ap per class
-        # for index, value in enumerate(maps):
-        #     print(index, value)
-
         # save results
         mr = ModelResults()
         if epoch is not None:
@@ -96,6 +94,13 @@ class SqlStream:
         mr.val_obj_loss = val_obj_loss
         mr.val_cls_loss = val_cls_loss
         db.session.add(mr)
+        db.session.flush()
+
+        # ap per class
+        for index, value in enumerate(maps):
+            mcr = ModelClassResult(model_results_id=mr.id, class_id=index, confidence=value)
+            db.session.add(mcr)
+
         db.session.commit()
 
         return mr
@@ -125,8 +130,7 @@ class SqlStream:
                     x, y, w, h = xywh
                     conf = conf.item()
                     predictions.append((x,y,w,h,conf,int(class_nr)))
-
-                    # todo use these results to pick bad images
+        # todo update database with error detections
         if len(predictions) != len(annotations):
             return
         for x, y, w, h, conf, class_nr in predictions:
@@ -282,9 +286,9 @@ class TrainSession:
                 continue
 
             if image.subset_id == self.ss_train_id:
-                if has_train:
-                    continue
-                has_train = True
+                # if has_train:
+                #     continue
+                # has_train = True
                 if image.id in self.stream.good_images:
                     continue
                 location = f"{APP_ROOT_PATH}/yolo/data/train"

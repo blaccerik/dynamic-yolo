@@ -23,12 +23,12 @@ def hello_world():
 
 @mod.route('/hey')
 def hello_world2():
-    # with open("model_27.pt", "br") as f:
-    #     a = f.read()
-    #     m = Model.query.get(2)
-    #     m.model = a
-    #     m.model_status_id = 2
-    #     db.session.commit()
+    with open("model_27.pt", "br") as f:
+        a = f.read()
+        m = Model.query.get(8)
+        m.model = a
+        db.session.add(m)
+        db.session.commit()
     return "eee"
 
 @mod.route('/train')

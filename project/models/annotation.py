@@ -5,7 +5,6 @@ from project import db
 
 class Annotation(db.Model):
     id = Column(BigInteger, primary_key=True)
-    confidence = Column(Float, nullable=True)
     x_center = Column(Float, nullable=False)
     y_center = Column(Float, nullable=False)
     width = Column(Float, nullable=False)

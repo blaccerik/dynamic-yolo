@@ -49,6 +49,7 @@ def upload_file(file):
 
 def _upload_images(images, location, person, ratio, split):
     count = 0
+    total_count = 0
     threshold = int(ratio * len(images))
     image_nr = 0
     ano_nr = 0
@@ -61,7 +62,7 @@ def _upload_images(images, location, person, ratio, split):
         subset_id = ss_train.id
     for ds in images:
         if split == "random":
-            if count > threshold:  # add to test
+            if total_count > threshold:  # add to test
                 subset_id = ss_test.id
             else:  # add to train
                 subset_id = ss_train.id
@@ -83,6 +84,7 @@ def _upload_images(images, location, person, ratio, split):
         if count >= BATCH_SIZE:
             db.session.commit()
             count = 0
+        total_count += 1
     db.session.commit()
     return image_nr, ano_nr
 
