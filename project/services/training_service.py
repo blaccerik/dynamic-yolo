@@ -443,11 +443,11 @@ class TrainSession:
         # see if model needs to be retrained
         needs_auto_train = mr.metric_map_50 < self.project_settings.minimal_map_50_threshold or \
                            mr.metric_map_50_95 < self.project_settings.minimal_map_50_95_threshold or \
-                           mr.metric_recall < self.project_settings.minimal_map_recall_threshold or \
-                           mr.metric_precision < self.project_settings.minimal_map_recall_threshold
+                           mr.metric_recall < self.project_settings.minimal_recall_threshold or \
+                           mr.metric_precision < self.project_settings.minimal_recall_threshold
 
         if needs_auto_train:
-            add_to_queue(self.project.id, "retrain")
+            add_to_queue(self.project.id, False)
         return False
 
     def cleanup(self):
@@ -539,8 +539,7 @@ def start_training(project: Project) -> bool:
     print("ts 1")
     ts = TrainSession(project, project_settings, name, ss_test.id, ss_train.id)
     print("ts 3")
-    # ts.pretest()
-    # return False
+    ts.pretest()
     print("ts 4")
     ts.load_yaml()
     print("ts 5")
