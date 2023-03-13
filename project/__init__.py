@@ -91,6 +91,8 @@ def initialize_extensions(app):
     from project.models.model_image import ModelImage
     from project.models.initial_model import InitialModel
     from project.models.subset import Subset
+    from project.models.model_class_results import ModelClassResult
+    from project.models.annotation_extra import AnnotationErrors
 
 
 def register_blueprints(app):

@@ -24,7 +24,10 @@ class ProjectSettings(db.Model):
     pretest_size_difference_threshold = Column(Float, nullable=False, default=0.05)
     maximum_auto_train_number = Column(Integer, nullable=False, default=3)
     skip_pretesting = Column(Boolean, nullable=False, default=False)
+    freeze_backbone = Column(Boolean, nullable=False, default=False)
+    use_ram = Column(Boolean, nullable=False, default=False)
 
+    # auto train
     minimal_map_50_threshold = Column(Float, nullable=False, default=0)
     minimal_map_50_95_threshold = Column(Float, nullable=False, default=0)
     minimal_precision_threshold = Column(Float, nullable=False, default=0)
