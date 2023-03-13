@@ -4,9 +4,10 @@ from project import db
 from project.models.annotation import Annotation
 
 
-class AnnotationExtra(db.Model):
-    id_robot = Column(BigInteger, ForeignKey(Annotation.id), primary_key=True)
-    id_human = Column(BigInteger, ForeignKey(Annotation.id), nullable=False)
+class AnnotationErrors(db.Model):
+    id = Column(BigInteger, primary_key=True)
+    id_robot = Column(BigInteger, ForeignKey(Annotation.id), nullable=True)
+    id_human = Column(BigInteger, ForeignKey(Annotation.id), nullable=True)
 
-    confidence = Column(Float, nullable=False)
+    confidence = Column(Float, nullable=True)
     training_amount = Column(Integer, nullable=False)

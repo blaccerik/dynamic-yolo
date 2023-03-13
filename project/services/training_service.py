@@ -8,11 +8,12 @@ import cv2
 import numpy as np
 import torch
 import yaml
-from sqlalchemy import and_
+from sqlalchemy import and_, func
 
 from project import db, APP_ROOT_PATH, DB_READ_BATCH_SIZE, NUMBER_OF_YOLO_WORKERS
 from project.models.annotation import Annotation
-from project.models.annotation_extra import AnnotationExtra
+from project.models.annotation_extra import AnnotationErrors
+from project.models.annotator import Annotator
 from project.models.image import Image
 from project.models.image_class import ImageClass
 from project.models.initial_model import InitialModel
@@ -24,8 +25,15 @@ from project.models.model_status import ModelStatus
 from project.models.project import Project
 from project.models.project_settings import ProjectSettings
 from project.models.subset import Subset
+from project.services.user_service import create_user
 from project.yolo.yolov5.utils.augmentations import letterbox
 from project.yolo.yolov5.utils.general import scale_boxes, xyxy2xywh
+
+class Prediction:
+
+    def __init__(self, annotation, conf):
+        self.annotation = annotation
+        self.conf = conf
 
 class SqlStream:
 
@@ -57,21 +65,53 @@ class SqlStream:
             Image.subset_id == self.ss_train_id
         ))
         c = 0
-        for image in images.yield_per(DB_READ_BATCH_SIZE):
-            content = image.image
-            nparr = np.frombuffer(content, np.uint8)
 
-            # Decode numpy array into image
-            im0 = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        batch_size = DB_READ_BATCH_SIZE
+        start_idx = 0
+        while True:
+            # Fetch the next batch of images
+            images_batch = images.offset(start_idx).limit(batch_size).all()
 
-            im = letterbox(im0, self.img_size, stride=self.stride, auto=self.auto)[0]  # padded resize
-            im = im.transpose((2, 0, 1))[::-1]  # HWC to CHW, BGR to RGB
-            im = np.ascontiguousarray(im)  # contiguous
-
-            yield im, im0, image.id
-            c += 1
-            if c == 10000:
+            # If there are no more images to process, break out of the loop
+            if not images_batch:
                 break
+
+            for image in images_batch:
+                content = image.image
+                nparr = np.frombuffer(content, np.uint8)
+
+                # Decode numpy array into image
+                im0 = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+                im = letterbox(im0, self.img_size, stride=self.stride, auto=self.auto)[0]  # padded resize
+                im = im.transpose((2, 0, 1))[::-1]  # HWC to CHW, BGR to RGB
+                im = np.ascontiguousarray(im)  # contiguous
+
+                yield im, im0, image.id
+
+            # Commit changes to the database and start a new transaction
+            db.session.commit()
+            db.session.begin()
+
+            # Update the start index for the next batch
+            start_idx += batch_size
+        # print("done")
+
+        # for image in images.yield_per(DB_READ_BATCH_SIZE):
+        #     content = image.image
+        #     nparr = np.frombuffer(content, np.uint8)
+        #
+        #     # Decode numpy array into image
+        #     im0 = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        #
+        #     im = letterbox(im0, self.img_size, stride=self.stride, auto=self.auto)[0]  # padded resize
+        #     im = im.transpose((2, 0, 1))[::-1]  # HWC to CHW, BGR to RGB
+        #     im = np.ascontiguousarray(im)  # contiguous
+        #
+        #     yield im, im0, image.id
+        #     c += 1
+        #     if c == 50888:
+        #         break
 
     def add_results_to_db(self, results, maps, subset, epoch=None):
         if subset == "train":
@@ -105,16 +145,62 @@ class SqlStream:
 
         return mr
 
-    def distance(self, p1: Annotation, x, y):
+    def distance(self, p1: Annotation, p: Prediction):
         """Calculate the Euclidean distance between two points"""
-        return math.sqrt((p1.x_center - x) ** 2 + (p1.y_center - y) ** 2)
+        return math.sqrt((p1.x_center - p.annotation.x_center) ** 2 + (p1.y_center - p.annotation.y_center) ** 2)
+
+    def find_mappings(self, annotations, predictions):
+        mappings = []
+        # for every prediction find the closest annotation while being sorted by distance
+        for prediction in sorted(predictions,
+                                 key=lambda p: self.distance(min(annotations, key=lambda a: self.distance(a, p)), p)):
+            if len(annotations) == 0:
+                mappings.append((prediction, None))
+                continue
+            closest_ano = min(annotations, key=lambda a: self.distance(a, prediction))
+            annotations.remove(closest_ano)
+            mappings.append((prediction, closest_ano))
+        for a in annotations:
+            mappings.append((None, a))
+        return mappings
+
+    def is_close_enough(self, pred: Prediction, ano: Annotation):
+        if pred is None:
+            return False
+        elif ano is None:
+            return False
+        ano2 = pred.annotation
+        if ano2.class_id != ano.class_id:
+            return False
+        w_diff = abs(ano2.width - ano.width)
+        h_diff = abs(ano2.height - ano.height)
+        x_diff = abs(ano2.x_center - ano.x_center)
+        y_diff = abs(ano2.y_center - ano.y_center)
+        return w_diff < self.project_settings.pretest_size_difference_threshold and \
+            h_diff < self.project_settings.pretest_size_difference_threshold and \
+            x_diff < self.project_settings.pretest_size_difference_threshold and \
+            y_diff < self.project_settings.pretest_size_difference_threshold
 
     def normalize_preds(self, pred, im0, im, image_id):
 
         annotations = Annotation.query.filter(and_(
             Annotation.project_id == self.project_id,
-            Annotation.image_id == image_id
+            Annotation.image_id == image_id,
+            Annotation.model_id == None
         )).all()
+
+        # how many times image has been used
+        times_used = db.session.query(
+            func.sum(Model.epochs)
+        ).join(
+            ModelImage, ModelImage.model_id == Model.id
+        ).filter(
+            ModelImage.image_id == image_id
+        ).group_by(
+            ModelImage.image_id
+        ).scalar()
+        if times_used is None:
+            times_used = 0
 
         predictions = []
         for i, det in enumerate(pred):  # per image
@@ -129,23 +215,44 @@ class SqlStream:
                     class_nr = cls.item()
                     x, y, w, h = xywh
                     conf = conf.item()
-                    predictions.append((x,y,w,h,conf,int(class_nr)))
-        # todo update database with error detections
-        if len(predictions) != len(annotations):
-            return
-        for x, y, w, h, conf, class_nr in predictions:
-            closest_ano = min(annotations, key=lambda a: self.distance(a, x, y))
-            if class_nr != closest_ano.class_id:
-                break
-            w_diff = abs(w - closest_ano.width)
-            h_diff = abs(h - closest_ano.height)
-            # print(f"{x:.3f} {y:.3f} {w:.3f} {h:.3f}")
-            # print(f"{closest_ano.x_center:.3f} {closest_ano.y_center:.3f} {closest_ano.width:.3f} {closest_ano.height:.3f}")
-            if w_diff > self.project_settings.pretest_size_difference_threshold:
-                break
-            elif h_diff > self.project_settings.pretest_size_difference_threshold:
-                break
-        else:
+
+                    ano = Annotation(
+                        x_center=x,
+                        y_center=y,
+                        width=w,
+                        height=h,
+                        class_id=class_nr,
+
+                        # metadata
+                        project_id=self.project_id,
+                        image_id=image_id,
+                        model_id=self.db_model.id
+                    )
+                    db.session.add(ano)
+
+                    predictions.append(Prediction(ano,conf))
+
+        db.session.flush()
+
+        mappings = self.find_mappings(annotations, predictions)
+        is_all_correct = True
+        # write results to database
+        for pred, ano in mappings:
+
+            # check if needs to make db entry
+            if self.is_close_enough(pred, ano):
+                continue
+            is_all_correct = False
+            ae = AnnotationErrors()
+            if ano is not None:
+                ae.id_human = ano.id
+            if pred is not None:
+                ae.id_robot = pred.annotation.id
+                ae.confidence = pred.conf
+            ae.training_amount = times_used
+            db.session.add(ae)
+
+        if is_all_correct:
             self.good_images.add(image_id)
 
 
@@ -210,6 +317,9 @@ class TrainSession:
             with open(f'{APP_ROOT_PATH}/yolo/data/backbone.yaml', 'w') as outfile:
                 yaml.dump(yaml_file, outfile, default_flow_style=False)
 
+        # create a annotator
+        # name = f"project_{self.project.id}_model_{self.db_model.id}"
+        # user_id = create_user(name)
         self.stream = SqlStream(self.project.id, self.project_settings, self.ss_train_id, self.ss_test_id, self.db_model)
 
 
@@ -306,7 +416,11 @@ class TrainSession:
             with open(f"{location}/images/{image.id}.png", "wb") as binary_file:
                 binary_file.write(content)
 
-            annotations = Annotation.query.filter_by(project_id=self.project.id, image_id=image.id)
+            annotations = Annotation.query.filter(and_(
+                Annotation.project_id==self.project.id,
+                Annotation.image_id==image.id,
+                Annotation.model_id==None
+            ))
             text = ""
 
             # save label
@@ -545,6 +659,7 @@ def start_training(project: Project) -> bool:
     print("ts 3")
     ts.pretest()
     print("ts 4")
+    # return False
     ts.load_yaml()
     print("ts 5")
     ts.load_data()

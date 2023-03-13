@@ -25,7 +25,7 @@ def hello_world():
 def hello_world2():
     with open("model_27.pt", "br") as f:
         a = f.read()
-        m = Model.query.get(8)
+        m = Model.query.get(2)
         m.model = a
         db.session.add(m)
         db.session.commit()
