@@ -91,7 +91,6 @@ class SqlStream:
 
             # Commit changes to the database and start a new transaction
             db.session.commit()
-            db.session.begin()
 
             # Update the start index for the next batch
             start_idx += batch_size
