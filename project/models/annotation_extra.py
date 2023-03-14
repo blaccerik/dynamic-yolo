@@ -11,3 +11,4 @@ class AnnotationErrors(db.Model):
 
     confidence = Column(Float, nullable=True)
     training_amount = Column(Integer, nullable=False)
+    model_id = Column(BigInteger, ForeignKey("model.id"), nullable=False)

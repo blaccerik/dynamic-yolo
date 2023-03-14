@@ -94,23 +94,6 @@ class SqlStream:
 
             # Update the start index for the next batch
             start_idx += batch_size
-        # print("done")
-
-        # for image in images.yield_per(DB_READ_BATCH_SIZE):
-        #     content = image.image
-        #     nparr = np.frombuffer(content, np.uint8)
-        #
-        #     # Decode numpy array into image
-        #     im0 = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-        #
-        #     im = letterbox(im0, self.img_size, stride=self.stride, auto=self.auto)[0]  # padded resize
-        #     im = im.transpose((2, 0, 1))[::-1]  # HWC to CHW, BGR to RGB
-        #     im = np.ascontiguousarray(im)  # contiguous
-        #
-        #     yield im, im0, image.id
-        #     c += 1
-        #     if c == 50888:
-        #         break
 
     def add_results_to_db(self, results, maps, subset, epoch=None):
         if subset == "train":
@@ -185,8 +168,10 @@ class SqlStream:
         annotations = Annotation.query.filter(and_(
             Annotation.project_id == self.project_id,
             Annotation.image_id == image_id,
-            Annotation.model_id == None
+            Annotation.annotator_id != None
         )).all()
+
+        print(image_id, len(annotations))
 
         # how many times image has been used
         times_used = db.session.query(
@@ -224,8 +209,7 @@ class SqlStream:
 
                         # metadata
                         project_id=self.project_id,
-                        image_id=image_id,
-                        model_id=self.db_model.id
+                        image_id=image_id
                     )
                     db.session.add(ano)
 
@@ -248,6 +232,7 @@ class SqlStream:
             if pred is not None:
                 ae.id_robot = pred.annotation.id
                 ae.confidence = pred.conf
+            ae.model_id = self.db_model.id
             ae.training_amount = times_used
             db.session.add(ae)
 
@@ -418,7 +403,7 @@ class TrainSession:
             annotations = Annotation.query.filter(and_(
                 Annotation.project_id==self.project.id,
                 Annotation.image_id==image.id,
-                Annotation.model_id==None
+                Annotation.annotator_id!=None
             ))
             text = ""
 
@@ -460,8 +445,8 @@ class TrainSession:
         setattr(opt, "project", f"{APP_ROOT_PATH}/yolo/data/model")
         setattr(opt, "name", "yolo_train")
 
-        # TODO add option for ram storage
-        # setattr(opt, "cache", "ram")
+        if self.project_settings.use_ram:
+            setattr(opt, "cache", "ram")
         # setattr(opt, "cache", "disk")  # dont use disk cache, super slow
         setattr(opt, "workers", NUMBER_OF_YOLO_WORKERS)
 
@@ -470,6 +455,8 @@ class TrainSession:
             setattr(opt, "cfg", f"{APP_ROOT_PATH}/yolo/data/backbone.yaml")
         else:
             setattr(opt, "weights", f"{APP_ROOT_PATH}/yolo/data/weights.pt")
+            if self.project_settings.freeze_backbone:
+                setattr(opt, "freeze", [10])
             setattr(opt, "cfg", "")
 
         # add model id to opt
