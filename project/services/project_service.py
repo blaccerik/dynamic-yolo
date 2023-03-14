@@ -153,11 +153,20 @@ def get_settings(project_code: int) -> dict:
         "batch_size": project_settings.batch_size,
         "img_size": project_settings.img_size,
         "initial_model": name,
-        "confidence_threshold": project_settings.confidence_threshold,
+
         "train_test_ratio": project_settings.train_test_ratio,
+        "pretest_size_difference_threshold": project_settings.pretest_size_difference_threshold,
+        "maximum_auto_train_number": project_settings.maximum_auto_train_number,
+        "skip_pretesting": project_settings.skip_pretesting,
+
         "minimal_map_50_threshold": project_settings.minimal_map_50_threshold,
+        "minimal_map_50_95_threshold": project_settings.minimal_map_50_95_threshold,
+        "minimal_precision_threshold": project_settings.minimal_precision_threshold,
+        "minimal_recall_threshold": project_settings.minimal_recall_threshold,
+
         "min_confidence_threshold": project_settings.min_confidence_threshold,
         "min_iou_threshold": project_settings.min_iou_threshold
+
     }
 
 

@@ -4,9 +4,17 @@ from marshmallow import Schema, fields, validates_schema, ValidationError
 class ProjectSettingsSchema(Schema):
     epochs = fields.Integer(required=False)
     batch_size = fields.Integer(required=False)
-    confidence_threshold = fields.Float(required=False)
+
     train_test_ratio = fields.Float(required=False)
+    pretest_size_difference_threshold = fields.Float(required=False)
+    maximum_auto_train_number = fields.Integer(required=False)
+    skip_pretesting = fields.Boolean(required=False)
+
     minimal_map_50_threshold = fields.Float(required=False)
+    minimal_map_50_95_threshold = fields.Float(required=False)
+    minimal_precision_threshold = fields.Float(required=False)
+    minimal_recall_threshold = fields.Float(required=False)
+
     min_confidence_threshold = fields.Float(required=False)
     min_iou_threshold = fields.Float(required=False)
 
@@ -23,7 +31,11 @@ class ProjectSettingsSchema(Schema):
         self.in_range("train_test_ratio", data)
         self.in_range("minimal_map_50_threshold", data)
         self.in_range("min_confidence_threshold", data)
-        self.in_range("min_iou_thresholdd", data)
+        self.in_range("min_iou_threshold", data)
+        self.in_range("pretest_size_difference_threshold", data)
+        self.in_range("minimal_map_50_95_threshold", data)
+        self.in_range("minimal_recall_threshold", data)
+        self.in_range("minimal_precision_threshold", data)
 
     def in_range(self, key, data):
         if key in data:

@@ -69,7 +69,6 @@ def _text_to_annotations(content, filename):
     return _list
 
 
-
 def _bytes_to_image(content, filename):
     try:
         img = PIL.Image.open(io.BytesIO(content))
@@ -97,6 +96,7 @@ def _check_zip_file(content):
         else:
             raise ValidationError({'error': f'not supported parsing {filename}'})
     return files
+
 
 def _check_files(files):
     final_files = []
@@ -138,6 +138,7 @@ def get_projects():
     serialized_projects = project_schema.dump(all_projects)
 
     return serialized_projects
+
 
 @REQUEST_API.route('/<int:project_id>/upload', methods=["POST"])
 def upload(project_id: int):
@@ -194,7 +195,6 @@ def get_project_images(project_id):
 
     images = get_images(project_id, page_size, page_nr)
     return jsonify(images), 200
-
 
 
 @REQUEST_API.route('/<int:project_id>/models', methods=['GET'])
