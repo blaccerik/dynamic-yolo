@@ -29,5 +29,6 @@ def change_annotation(annotation_id):
     if errors:
         return jsonify({'error': f'Please check the following fields: {errors}'}), 400
 
+    data.pop('project_id')
     change_annotation_values(annotation_id, data)
     return jsonify({'message': f'Successfully updated these settings: {data}'}), 200
