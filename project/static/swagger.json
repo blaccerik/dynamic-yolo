@@ -381,6 +381,28 @@
             "schema": {
               "type": "integer"
             }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "Number of models to be returned per page",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "page_nr",
+            "in": "query",
+            "description": "Page number",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
           }
         ],
         "summary": "Get all models in a project",
@@ -615,6 +637,50 @@
             "required": false,
             "schema": {
               "type": "integer"
+            }
+          },
+          {
+            "name": "model_id",
+            "in": "query",
+            "description": "Model ID of the result",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "subset_name",
+            "in": "query",
+            "description": "Name of the subset",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "test",
+                "train"
+              ]
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "Number of results to be returned per page",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "page_nr",
+            "in": "query",
+            "description": "Page number",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 1
             }
           }
         ],
@@ -1076,7 +1142,10 @@
           "result_id": {
             "type": "integer"
           },
-          "project_id": {
+          "subset_name": {
+            "type": "string"
+          },
+          "model_id": {
             "type": "integer"
           },
           "metric_precision": {

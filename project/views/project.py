@@ -199,7 +199,12 @@ def get_project_images(project_id):
 
 @REQUEST_API.route('/<int:project_id>/models', methods=['GET'])
 def get_all_models(project_id):
-    models = get_models(project_id)
+    page_size = request.args.get("page_size")
+    page_size = validate_page_size(page_size, 20, 100)
+    page_nr = request.args.get("page_nr")
+    page_nr = validate_page_nr(page_nr)
+
+    models = get_models(project_id, page_nr, page_size)
 
     return models
 
