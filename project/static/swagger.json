@@ -738,17 +738,32 @@
             "type": "integer",
             "description": "Batch size for training"
           },
-          "confidence_threshold": {
-            "type": "number",
-            "description": "Confidence threshold for skipping images"
-          },
           "train_test_ratio": {
             "type": "number",
             "description": "Training and testing data split ratio"
           },
+          "pretest_size_difference": {
+            "type": "number"
+          },
+          "maximum_auto_train_number": {
+            "type": "number"
+          },
+          "skip_pretesting": {
+            "type": "boolean",
+            "default": false
+          },
           "minimal_map_50_threshold": {
             "type": "number",
             "description": "Minimal map threshold"
+          },
+          "minimal_map_50_95_threshold": {
+            "type": "number"
+          },
+          "minimal_precision_threshold": {
+            "type": "number"
+          },
+          "minimal_recall_threshold": {
+            "type": "number"
           },
           "min_confidence_threshold": {
             "type": "number",
@@ -779,13 +794,28 @@
             "type": "string",
             "format": "string"
           },
-          "confidence_threshold": {
-            "type": "integer"
-          },
           "train_test_ratio": {
             "type": "integer"
           },
+          "pretest_size_difference_threshold": {
+            "type": "number"
+          },
+          "maximum_auto_train_number": {
+            "type": "integer"
+          },
+          "skip_pretesting": {
+            "type": "boolean"
+          },
           "minimal_map_50_threshold": {
+            "type": "integer"
+          },
+          "minimal_map_50_95_threshold": {
+            "type": "integer"
+          },
+          "minimal_precision_threshold": {
+            "type": "integer"
+          },
+          "minimal_recall_threshold": {
             "type": "integer"
           },
           "min_confidence_threshold": {
