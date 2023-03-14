@@ -168,8 +168,10 @@ class SqlStream:
         annotations = Annotation.query.filter(and_(
             Annotation.project_id == self.project_id,
             Annotation.image_id == image_id,
-            Annotation.model_id == None
+            Annotation.annotator_id != None
         )).all()
+
+        print(image_id, len(annotations))
 
         # how many times image has been used
         times_used = db.session.query(
@@ -207,8 +209,7 @@ class SqlStream:
 
                         # metadata
                         project_id=self.project_id,
-                        image_id=image_id,
-                        model_id=self.db_model.id
+                        image_id=image_id
                     )
                     db.session.add(ano)
 
@@ -231,6 +232,7 @@ class SqlStream:
             if pred is not None:
                 ae.id_robot = pred.annotation.id
                 ae.confidence = pred.conf
+            ae.model_id = self.db_model.id
             ae.training_amount = times_used
             db.session.add(ae)
 
@@ -401,7 +403,7 @@ class TrainSession:
             annotations = Annotation.query.filter(and_(
                 Annotation.project_id==self.project.id,
                 Annotation.image_id==image.id,
-                Annotation.model_id==None
+                Annotation.annotator_id!=None
             ))
             text = ""
 

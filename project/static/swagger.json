@@ -344,6 +344,43 @@
             "schema": {
               "type": "integer"
             }
+          },
+          {
+            "name": "show_errors",
+            "in": "query",
+            "description": "Show bounding boxes of errors",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              }
+            },
+            "style": "form",
+            "explode": true
+          },
+          {
+            "name": "show_annotations",
+            "in": "query",
+            "description": "Show bounding boxes",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          {
+            "name": "show_type",
+            "in": "query",
+            "description": "Show errors for latest model only",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "latest",
+                "all"
+              ]
+            }
           }
         ],
         "responses": {
