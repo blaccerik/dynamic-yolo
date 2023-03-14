@@ -855,6 +855,14 @@
             "type": "boolean",
             "default": false
           },
+           "freeze_backbone": {
+            "type": "boolean",
+            "default": false
+          },
+          "use_ram": {
+            "type": "boolean",
+            "default": false
+          },
           "minimal_map_50_threshold": {
             "type": "number",
             "description": "Minimal map threshold"
@@ -907,6 +915,12 @@
             "type": "integer"
           },
           "skip_pretesting": {
+            "type": "boolean"
+          },
+          "freeze_backbone": {
+            "type": "boolean"
+          },
+          "use_ram": {
             "type": "boolean"
           },
           "minimal_map_50_threshold": {
