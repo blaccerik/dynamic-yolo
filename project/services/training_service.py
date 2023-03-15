@@ -12,7 +12,7 @@ from sqlalchemy import and_, func
 
 from project import db, APP_ROOT_PATH, DB_READ_BATCH_SIZE, NUMBER_OF_YOLO_WORKERS
 from project.models.annotation import Annotation
-from project.models.annotation_extra import AnnotationErrors
+from project.models.annotation_extra import AnnotationError
 from project.models.annotator import Annotator
 from project.models.image import Image
 from project.models.image_class import ImageClass
@@ -37,11 +37,12 @@ class Prediction:
 
 class SqlStream:
 
-    def __init__(self, project_id, project_settings, ss_train_id, ss_test_id, db_model):
+    def __init__(self, project_id, project_settings, ss_val_id, ss_test_id, ss_train_id, db_model):
         self.project_id = project_id
         self.project_settings = project_settings
-        self.ss_train_id = ss_train_id
+        self.ss_val_id = ss_val_id
         self.ss_test_id = ss_test_id
+        self.ss_train_id = ss_train_id
         self.db_model = db_model
 
         self.best = None
@@ -96,8 +97,8 @@ class SqlStream:
             start_idx += batch_size
 
     def add_results_to_db(self, results, maps, subset, epoch=None):
-        if subset == "train":
-            subset_id = self.ss_train_id
+        if subset == "val":
+            subset_id = self.ss_val_id
         elif subset == "test":
             subset_id = self.ss_test_id
         metric_precision, metric_recall, metric_map_50, metric_map_50_95, val_box_loss, val_obj_loss, val_cls_loss = results
@@ -132,16 +133,22 @@ class SqlStream:
         return math.sqrt((p1.x_center - p.annotation.x_center) ** 2 + (p1.y_center - p.annotation.y_center) ** 2)
 
     def find_mappings(self, annotations, predictions):
+        # print("m", len(annotations), len(predictions))
         mappings = []
+
+        if len(annotations) == 0:
+            for p in predictions:
+                mappings.append((p, None))
+            return mappings
+
         # for every prediction find the closest annotation while being sorted by distance
         for prediction in sorted(predictions,
                                  key=lambda p: self.distance(min(annotations, key=lambda a: self.distance(a, p)), p)):
-            if len(annotations) == 0:
-                mappings.append((prediction, None))
-                continue
             closest_ano = min(annotations, key=lambda a: self.distance(a, prediction))
             annotations.remove(closest_ano)
             mappings.append((prediction, closest_ano))
+            if len(annotations) == 0:
+                break
         for a in annotations:
             mappings.append((None, a))
         return mappings
@@ -170,8 +177,6 @@ class SqlStream:
             Annotation.image_id == image_id,
             Annotation.annotator_id != None
         )).all()
-
-        print(image_id, len(annotations))
 
         # how many times image has been used
         times_used = db.session.query(
@@ -216,7 +221,6 @@ class SqlStream:
                     predictions.append(Prediction(ano,conf))
 
         db.session.flush()
-
         mappings = self.find_mappings(annotations, predictions)
         is_all_correct = True
         # write results to database
@@ -224,16 +228,19 @@ class SqlStream:
 
             # check if needs to make db entry
             if self.is_close_enough(pred, ano):
+                # if pred overlapped with annotation then there is no need to add to database
+                db.session.delete(pred.annotation)
                 continue
             is_all_correct = False
-            ae = AnnotationErrors()
+            ae = AnnotationError()
             if ano is not None:
-                ae.id_human = ano.id
+                ae.human_annotation_id = ano.id
             if pred is not None:
-                ae.id_robot = pred.annotation.id
+                ae.model_annotation_id = pred.annotation.id
                 ae.confidence = pred.conf
             ae.model_id = self.db_model.id
             ae.training_amount = times_used
+            ae.image_id = image_id
             db.session.add(ae)
 
         if is_all_correct:
@@ -249,7 +256,8 @@ class TrainSession:
                  project_settings: ProjectSettings,
                  name: str,
                  ss_test_id: int,
-                 ss_train_id: int):
+                 ss_train_id: int,
+                 ss_val_id: int):
         self.ms_train = ModelStatus.query.filter(ModelStatus.name.like("training")).first()
         self.ms_test = ModelStatus.query.filter(ModelStatus.name.like("testing")).first()
         self.ms_ready = ModelStatus.query.filter(ModelStatus.name.like("ready")).first()
@@ -257,6 +265,7 @@ class TrainSession:
 
         self.ss_test_id = ss_test_id
         self.ss_train_id = ss_train_id
+        self.ss_val_id = ss_val_id
 
         # create new model
         self.db_model = Model(model_status_id=self.ms_test.id, project_id=project.id, epochs=project_settings.epochs)
@@ -304,7 +313,7 @@ class TrainSession:
         # create a annotator
         # name = f"project_{self.project.id}_model_{self.db_model.id}"
         # user_id = create_user(name)
-        self.stream = SqlStream(self.project.id, self.project_settings, self.ss_train_id, self.ss_test_id, self.db_model)
+        self.stream = SqlStream(self.project.id, self.project_settings, self.ss_val_id, self.ss_test_id, self.ss_train_id, self.db_model)
 
 
     def pretest(self):
@@ -343,7 +352,7 @@ class TrainSession:
         data = {
             "path": f"{APP_ROOT_PATH}/yolo/data",
             "train": "train",
-            "val": "train",
+            "val": "val",
             "test": "test",
             "names": {}
         }
@@ -391,6 +400,11 @@ class TrainSession:
                 #     continue
                 # has_test = True
                 location = f"{APP_ROOT_PATH}/yolo/data/test"
+            elif image.subset_id == self.ss_val_id:
+                # if has_test:
+                #     continue
+                # has_test = True
+                location = f"{APP_ROOT_PATH}/yolo/data/val"
             else:
                 print(image.subset_id, self.ss_train_id, self.ss_test_id)
                 raise RuntimeError("subset id not found")
@@ -587,6 +601,9 @@ def initialize_yolo_folders():
     create_path(f"{APP_ROOT_PATH}/yolo/data/test")
     create_path(f"{APP_ROOT_PATH}/yolo/data/test/images")
     create_path(f"{APP_ROOT_PATH}/yolo/data/test/labels")
+    create_path(f"{APP_ROOT_PATH}/yolo/data/val")
+    create_path(f"{APP_ROOT_PATH}/yolo/data/val/images")
+    create_path(f"{APP_ROOT_PATH}/yolo/data/val/labels")
 
     create_path(f"{APP_ROOT_PATH}/yolo/data/pretest_images")
     create_path(f"{APP_ROOT_PATH}/yolo/data/pretest_results")
@@ -619,6 +636,7 @@ def start_training(project: Project) -> bool:
     # check if project has test and train data
     ss_test = Subset.query.filter(Subset.name.like("test")).first()
     ss_train = Subset.query.filter(Subset.name.like("train")).first()
+    ss_val = Subset.query.filter(Subset.name.like("val")).first()
 
     test_image = Image.query.filter(and_(
         Image.project_id == project.id,
@@ -628,11 +646,17 @@ def start_training(project: Project) -> bool:
         Image.project_id == project.id,
         Image.subset_id == ss_train.id
     )).first()
+    val_image = Image.query.filter(and_(
+        Image.project_id == project.id,
+        Image.subset_id == ss_val.id
+    )).first()
 
     # todo set minimum data amounts
     if test_image is None:
         return False
     if train_image is None:
+        return False
+    if val_image is None:
         return False
 
     # clear dirs
@@ -641,11 +665,10 @@ def start_training(project: Project) -> bool:
     initialize_yolo_folders()
 
     print("ts 1")
-    ts = TrainSession(project, project_settings, name, ss_test.id, ss_train.id)
+    ts = TrainSession(project, project_settings, name, ss_test.id, ss_train.id, ss_val.id)
     print("ts 3")
     ts.pretest()
     print("ts 4")
-    # return False
     ts.load_yaml()
     print("ts 5")
     ts.load_data()

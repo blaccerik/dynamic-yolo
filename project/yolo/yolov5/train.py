@@ -372,7 +372,7 @@ def train(hyp, opt, device, callbacks, binary_weights=None, yaml_dict=None, sql_
                                                 callbacks=callbacks,
                                                 compute_loss=compute_loss)
                 if sql_stream:
-                    sql_stream.add_results_to_db(results, maps, "train", epoch)
+                    sql_stream.add_results_to_db(results, maps, "val", epoch)
 
 
             # Update best mAP

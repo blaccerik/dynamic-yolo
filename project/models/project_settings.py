@@ -20,7 +20,8 @@ class ProjectSettings(db.Model):
     img_size = Column(Integer, nullable=False, default=640)
     initial_model_id = Column(Integer, ForeignKey("initial_model.id"), nullable=False, default=get_default_name_id)
 
-    train_test_ratio = Column(Float, nullable=False, default=0.75)
+    train_ratio = Column(Integer, nullable=False, default=50)
+    val_ratio = Column(Integer, nullable=False, default=25)
     pretest_size_difference_threshold = Column(Float, nullable=False, default=0.05)
     maximum_auto_train_number = Column(Integer, nullable=False, default=3)
     skip_pretesting = Column(Boolean, nullable=False, default=False)

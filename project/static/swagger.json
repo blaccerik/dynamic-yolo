@@ -346,20 +346,6 @@
             }
           },
           {
-            "name": "show_errors",
-            "in": "query",
-            "description": "Show bounding boxes of errors",
-            "required": false,
-            "schema": {
-              "type": "array",
-              "items": {
-                "type": "integer"
-              }
-            },
-            "style": "form",
-            "explode": true
-          },
-          {
             "name": "show_annotations",
             "in": "query",
             "description": "Show bounding boxes",
@@ -372,7 +358,58 @@
           {
             "name": "show_type",
             "in": "query",
-            "description": "Show errors for latest model only",
+            "description": "Show model errors",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "latest",
+                "all"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Image not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/images/{image_id}/errors": {
+      "get": {
+        "tags": [
+          "Images Requests"
+        ],
+        "summary": "Get image errors",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "image_id",
+            "description": "ID of the image to retrieve",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "show_type",
+            "in": "query",
+            "description": "Show model errors",
             "required": false,
             "schema": {
               "type": "string",
@@ -753,7 +790,12 @@
           },
           "split": {
             "type": "string",
-            "format": "string"
+            "enum": [
+              "train",
+              "val",
+              "test",
+              "random"
+            ]
           },
           "files": {
             "type": "array",
