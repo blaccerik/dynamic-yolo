@@ -2,11 +2,13 @@ from marshmallow import ValidationError
 
 from project import db
 from sqlalchemy import func, and_
+from sqlalchemy.orm import joinedload, subqueryload
 from project.models.annotation import Annotation
 from project.models.annotator import Annotator
 from project.models.image import Image
 from project.models.initial_model import InitialModel
 from project.models.model import Model
+from project.models.model_image import ModelImage
 from project.models.model_status import ModelStatus
 from project.models.project import Project
 from project.models.project_settings import ProjectSettings
@@ -81,30 +83,62 @@ def get_project_info(project_code: int):
 
 
 def get_images(project_code: int, page_size: int, page_nr: int):
+    """
+    Get all the images with all of its annotations and models.
+    :param project_code: ID of the project
+    :param page_size: Number of objects to be displayed per page
+    :param page_nr: Number of the page to visit
+    :return: Correctly formatted list with data
+    """
+
     project = Project.query.get(project_code)
     if project is None:
         raise ValidationError({"error": f"Project not found"})
+
     data = []
-    # get image data
-    ss_test = Subset.query.filter(Subset.name.like("test")).first()
-    ss_train = Subset.query.filter(Subset.name.like("train")).first()
-    for i in Image.query.filter(Image.project_id == project_code).paginate(page=page_nr, per_page=page_size,
-                                                                           error_out=False):
-        model_ids = [x.id for x in i.models]
-        annotation_ids = [x.id for x in i.annotations]
-        if i.subset_id == ss_test.id:
-            name = "test"
-        elif i.subset_id == ss_train.id:
-            name = "train"
-        else:
-            raise ValidationError({"error": f"Unknown id {i.subset_id}"})
+
+    subset_dict = {}
+    for subset in Subset.query.all():
+        subset_dict[subset.id] = subset.name
+
+    images_query = db.session.query(Image.id, Image.subset_id) \
+        .filter(Image.project_id == project_code) \
+        .limit(page_size) \
+        .offset(page_size * (page_nr - 1))
+
+    images = images_query.all()
+
+    image_ids = [image.id for image in images]
+
+    models_query = db.session.query(ModelImage.image_id, Model.id) \
+        .join(Model) \
+        .filter(ModelImage.image_id.in_(image_ids)) \
+        .order_by(Model.id)
+
+    models = models_query.all()
+
+    annotations_query = db.session.query(Annotation.image_id, Annotation.id) \
+        .filter(Annotation.image_id.in_(image_ids)) \
+        .order_by(Annotation.id)
+
+    annotations = annotations_query.all()
+
+    for image in images:
+        model_ids = [model.id for model in models if model.image_id == image.id]
+        annotation_ids = [annotation.id for annotation in annotations if annotation.image_id == image.id]
+
+        name = subset_dict[image.subset_id]
+        if name is None:
+            raise ValidationError({"error": f"Unknown subset ID: {image.subset_id}"})
+
         image_data = {
-            "id": i.id,
+            "id": image.id,
             "annotations": annotation_ids,
             "models": model_ids,
             "subset_name": name
         }
         data.append(image_data)
+
     return data
 
 
