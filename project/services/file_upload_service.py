@@ -47,25 +47,32 @@ def upload_file(file):
     db.session.commit()
 
 
-def _upload_images(images, location, person, ratio, split):
+def _upload_images(images, location, person, ps: ProjectSettings, split):
     count = 0
     total_count = 0
-    threshold = int(ratio * len(images))
     image_nr = 0
     ano_nr = 0
 
+    train_ratio = int(len(images) * ps.train_ratio / 100)
+    val_ratio = int(len(images) * (ps.train_ratio + ps.val_ratio) / 100)
+
     ss_test = Subset.query.filter(Subset.name.like("test")).first()
     ss_train = Subset.query.filter(Subset.name.like("train")).first()
+    ss_val = Subset.query.filter(Subset.name.like("val")).first()
     if split == "test":
         subset_id = ss_test.id
     elif split == "train":
         subset_id = ss_train.id
+    elif split == "val":
+        subset_id = ss_val.id
     for ds in images:
         if split == "random":
-            if total_count > threshold:  # add to test
-                subset_id = ss_test.id
-            else:  # add to train
+            if total_count < train_ratio:  # add to train
                 subset_id = ss_train.id
+            elif total_count < val_ratio:  # add to val
+                subset_id = ss_val.id
+            else:  # add to test
+                subset_id = ss_test.id
         image = ds.image
         anos = ds.annotations
         image.project_id = location
@@ -112,7 +119,7 @@ def upload_files(files: list, project_code: int, uploader: str, split: str) -> (
         raise UserNotAuthorized("Can't upload to 'unknown' project")
 
 
-    if split not in ["test", "train", "random"]:
+    if split not in ["test", "train", "random", "val"]:
         raise ValidationError({"error": f"Unknown split {split}"})
     ps = ProjectSettings.query.get(project.id)
 
@@ -148,7 +155,6 @@ def upload_files(files: list, project_code: int, uploader: str, split: str) -> (
                 entry = DictStorage()
             entry.has_annotations = True
             cache[name] = entry
-    ratio = ps.train_test_ratio
     # filter cache for good and bad images
 
     passed_images = []
@@ -162,8 +168,8 @@ def upload_files(files: list, project_code: int, uploader: str, split: str) -> (
             passed_images.append(ds)
 
     # upload images
-    passed_images_number, annotations_number = _upload_images(passed_images, project.id, annotator.id, ratio, split)
-    failed_images_number, _ = _upload_images(failed_images, unknown_project.id, annotator.id, ratio, split)
+    passed_images_number, annotations_number = _upload_images(passed_images, project.id, annotator.id, ps, split)
+    failed_images_number, _ = _upload_images(failed_images, unknown_project.id, annotator.id, ps, split)
 
     # add to queue
     add_to_queue(project.id)

@@ -15,9 +15,9 @@ class Annotation(db.Model):
     project_id = Column(BigInteger, ForeignKey("project.id"), nullable=False)
     image_id = Column(BigInteger, ForeignKey("image.id"), nullable=False)
     annotator_id = Column(BigInteger, ForeignKey("annotator.id"), nullable=True)
-    annotation_errors_robot = relationship('AnnotationErrors', foreign_keys='AnnotationErrors.id_robot',
+    model_annotation_errors = relationship('AnnotationError', foreign_keys='AnnotationError.model_annotation_id',
                                            cascade='all, delete')
-    annotation_errors_human = relationship('AnnotationErrors', foreign_keys='AnnotationErrors.id_human',
+    human_annotation_errors = relationship('AnnotationError', foreign_keys='AnnotationError.human_annotation_id',
                                            cascade='all, delete')
 
     # todo add check that both(annotator_id or model_id ) cant be null or have a value

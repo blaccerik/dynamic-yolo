@@ -92,7 +92,7 @@ def initialize_extensions(app):
     from project.models.initial_model import InitialModel
     from project.models.subset import Subset
     from project.models.model_class_results import ModelClassResult
-    from project.models.annotation_extra import AnnotationErrors
+    from project.models.annotation_extra import AnnotationError
 
 
 def register_blueprints(app):
@@ -190,7 +190,8 @@ def create_database(app):
 
         iss1 = Subset(name="test")
         iss2 = Subset(name="train")
-        db.session.add_all([iss1, iss2])
+        iss3 = Subset(name="val")
+        db.session.add_all([iss1, iss2, iss3])
         db.session.commit()
 
         p = Project(name="unknown")
