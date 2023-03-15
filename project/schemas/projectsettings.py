@@ -9,6 +9,8 @@ class ProjectSettingsSchema(Schema):
     pretest_size_difference_threshold = fields.Float(required=False)
     maximum_auto_train_number = fields.Integer(required=False)
     skip_pretesting = fields.Boolean(required=False)
+    freeze_backbone = fields.Boolean(required=False)
+    use_ram = fields.Boolean(required=False)
 
     minimal_map_50_threshold = fields.Float(required=False)
     minimal_map_50_95_threshold = fields.Float(required=False)

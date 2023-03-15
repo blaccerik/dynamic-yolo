@@ -158,6 +158,8 @@ def get_settings(project_code: int) -> dict:
         "pretest_size_difference_threshold": project_settings.pretest_size_difference_threshold,
         "maximum_auto_train_number": project_settings.maximum_auto_train_number,
         "skip_pretesting": project_settings.skip_pretesting,
+        "freeze_backbone": project_settings.freeze_backbone,
+        "use_ram": project_settings.use_ram,
 
         "minimal_map_50_threshold": project_settings.minimal_map_50_threshold,
         "minimal_map_50_95_threshold": project_settings.minimal_map_50_95_threshold,
