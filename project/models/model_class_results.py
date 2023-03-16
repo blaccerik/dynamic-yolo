@@ -5,7 +5,7 @@ from project import db
 
 class ModelClassResult(db.Model):
     model_results_id = Column(BigInteger, ForeignKey("model_results.id"), nullable=False)
-    class_id = Column(Float, nullable=False)
+    class_id = Column(Integer, nullable=False)
     confidence = Column(Float, nullable=False)
 
     __table_args__ = (PrimaryKeyConstraint("model_results_id", "class_id"),)

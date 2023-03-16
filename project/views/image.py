@@ -85,50 +85,60 @@ def deal_with_annotations(image_id, show_type, show_human_annotations):
 @REQUEST_API.route('/<int:image_id>', methods=['GET'])
 def get_image(image_id):
     show_type = request.args.get("show_type")
-    if show_type is None:
-        show_type = "all"
-    if show_type not in ['latest', 'all']:
+    if show_type not in ['latest', 'all', None]:
         raise ValidationError({"error": f"Bad request"})
 
     show_ano = request.args.get("show_annotations")
-    if show_ano is None:
-        show_ano = "true"
-    if show_ano not in ["true", "false"]:
+    if show_ano == "true":
+        show_ano = True
+    elif show_ano == "false":
+        show_ano = False
+    elif show_ano is not None:
         raise ValidationError({"error": f"Bad request"})
+
+    error_id = request.args.get("error_id")
+    if error_id is not None:
+        try:
+            error_id = int(error_id)
+        except:
+            raise ValidationError({"error": f"Bad request"})
 
     image = retrieve_image(image_id)
     if image is None:
         return jsonify({'error': 'Image not found!'}), 404
 
+    error_is_related(image_id, error_id)
     image_data = image.image
 
     # Decode the image using cv2.imdecode
     cv2_image = cv2.imdecode(np.frombuffer(image_data, np.uint8), cv2.IMREAD_COLOR)
 
-    errors, correct = deal_with_annotations(image_id, show_type, show_ano == "true")
+    # get related errors and human made annotations
+    errors, correct = get_errors_and_correct(image_id, error_id, show_ano, show_type)
 
     dh, dw, _ = cv2_image.shape
     color_red = (0,0,255)
     color_yellow = (0,255,255)
     color_green = (0,255,0)
-    for join in errors:
-        if join.a_human is None:
-            a = join.a_model
-            text = f"{a.class_id} {join.ae.confidence:.2f}"
-            add_ano_to_image(cv2_image, a, text, dh, dw, color_red)
-        elif join.a_model is None:
-            a = join.a_human
-            text = str(a.class_id)
-            add_ano_to_image(cv2_image, a, text, dh, dw, color_yellow)
+
+    skip = set()
+    for ae, am, ah in errors:
+        if ah is None:
+            text = f"{am.class_id} {ae.confidence:.2f}"
+            add_ano_to_image(cv2_image, am, text, dh, dw, color_red)
+        elif am is None:
+            text = str(ah.class_id)
+            add_ano_to_image(cv2_image, ah, text, dh, dw, color_yellow)
         else:
-            a = join.a_human
-            text = str(a.class_id)
-            add_ano_to_image(cv2_image, a, text, dh, dw, color_yellow)
-            a = join.a_model
-            text = f"{a.class_id} {join.ae.confidence:.2f}"
-            add_ano_to_image(cv2_image, a, text, dh, dw, color_red)
+            text = str(ah.class_id)
+            add_ano_to_image(cv2_image, ah, text, dh, dw, color_yellow)
+            text = f"{am.class_id} {ae.confidence:.2f}"
+            add_ano_to_image(cv2_image, am, text, dh, dw, color_red)
+            skip.add(ah.id)
 
     for a in correct:
+        if a.id in skip:
+            continue
         text = str(a.class_id)
         add_ano_to_image(cv2_image, a, text, dh, dw, color_green)
 
@@ -147,7 +157,8 @@ def get_dict_from_ano(ano: Annotation, ae: AnnotationError):
         "class_id": ano.class_id,
         "model_id": ae.model_id,
         "training_amount": ae.training_amount,
-        "confidence": ae.confidence
+        "confidence": ae.confidence,
+        "error_id": ae.id
     }
 
 
@@ -157,24 +168,30 @@ def get_image_errors(image_id):
         return jsonify({'error': 'Image not found!'}), 404
 
     show_type = request.args.get("show_type")
-    if show_type is None:
-        show_type = "all"
-    if show_type not in ['latest', 'all']:
+    if show_type not in ['latest', 'all', None]:
         raise ValidationError({"error": f"Bad request"})
 
-    errors, _ = deal_with_annotations(image_id, show_type, True)
+    error_id = request.args.get("error_id")
+    if error_id is not None:
+        try:
+            error_id = int(error_id)
+        except:
+            raise ValidationError({"error": f"Bad request"})
+
+    # get related errors and human made annotations
+    errors, _ = get_errors_and_correct(image_id, error_id, False, show_type)
     missing_human_annotations = []
     missing_model_annotations = []
     mismatch = []
-    for join in errors:
-        if join.a_human is None:
-            missing_human_annotations.append(get_dict_from_ano(join.a_model, join.ae))
-        elif join.a_model is None:
-            missing_model_annotations.append(get_dict_from_ano(join.a_human, join.ae))
+    for ae, am, ah in errors:
+        if ah is None:
+            missing_human_annotations.append(get_dict_from_ano(am, ae))
+        elif am is None:
+            missing_model_annotations.append(get_dict_from_ano(ah, ae))
         else:
             dict_ = {
-                "human_annotation": get_dict_from_ano(join.a_human, join.ae),
-                "model_annotation": get_dict_from_ano(join.a_model, join.ae)
+                "human_annotation": get_dict_from_ano(ah, ae),
+                "model_annotation": get_dict_from_ano(am, ae)
             }
             dict_["human_annotation"]["confidence"] = None
             mismatch.append(dict_)
