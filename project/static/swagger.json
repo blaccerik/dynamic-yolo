@@ -1439,9 +1439,6 @@
           "class_id": {
             "type": "integer"
           },
-          "project_id": {
-            "type": "integer"
-          },
           "image_id": {
             "type": "integer"
           }
@@ -1453,7 +1450,6 @@
           "width",
           "height",
           "class_id",
-          "project_id",
           "image_id"
         ]
       }

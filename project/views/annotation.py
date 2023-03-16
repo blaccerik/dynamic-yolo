@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, request
 
 from project.models.annotation import Annotation
+from project.models.image import Image
 from project.schemas.annotation import AnnotationSchema
 from project.schemas.annotation_upload import AnnotationUploadSchema
 from project.services.annotation_service import retrieve_annotation, change_annotation_values, \
@@ -56,6 +57,12 @@ def delete_annotation(annotation_id):
 def add_annotation():
     data = request.json
     uploader = request.args.get("uploader")
+    image_id = data['image_id']
+    if image_id == 0:
+        return jsonify({'error': f'Please check the following fields: image_id'}), 400
+
+    project_id = Image.query.get(data['image_id']).id
+    data['project_id'] = project_id
     data['uploader'] = uploader
 
     errors = AnnotationUploadSchema().validate(data)
