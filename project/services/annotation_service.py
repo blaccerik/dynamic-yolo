@@ -68,7 +68,7 @@ def remove_annotation_and_extras(annotation_code):
 
 
 def create_annotation(data, uploader_name):
-    user_id = Annotator.query.filter(Annotator.name.like(uploader_name)).first().id
+    user_id = Annotator.query.filter(Annotator.name == uploader_name).first().id
     annotation_to_upload = Annotation(x_center=data['x_center'],
                                       y_center=data['y_center'],
                                       width=data['width'],
@@ -81,3 +81,42 @@ def create_annotation(data, uploader_name):
     db.session.add(annotation_to_upload)
     db.session.commit()
     return annotation_to_upload.id
+
+
+def choose_between_annotations_to_keep(annotation_error_id, user_name, keep_value):
+    # TODO Fix the error statements
+    possible_keep_values = ['model', 'human', 'both']
+    annotation_error = AnnotationError.query.get(annotation_error_id)
+    user = Annotator.query.filter(Annotator.name == user_name).first()
+
+    if not user:
+        raise ValidationError("User not found")
+
+    if not annotation_error:
+        raise ValidationError("Annotation error not found")
+
+    if keep_value not in possible_keep_values:
+        raise ValidationError("Wrong keep option")
+
+    human_annotation = Annotation.query.get(annotation_error.human_annotation_id)
+    model_annotation = Annotation.query.get(annotation_error.model_annotation_id)
+
+    if keep_value == 'model':
+        if model_annotation:
+            model_annotation.annotator_id = user.id
+            db.session.delete(human_annotation)
+            db.session.delete(annotation_error)
+        else:
+            return 0, "Annotation error does not have model annotation"
+
+    elif keep_value == 'human':
+        if model_annotation:
+            db.session.delete(model_annotation)
+        db.session.delete(annotation_error)
+
+    elif keep_value == 'both':
+        if model_annotation:
+            model_annotation.annotator_id = user.id
+        db.session.delete(annotation_error)
+    db.session.commit()
+    return 1, "Success"

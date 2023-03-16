@@ -715,7 +715,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Succesful deletion.",
+            "description": "Succesful deletion."
           },
           "400": {
             "description": "Annotation not found."
@@ -793,6 +793,59 @@
           },
           "404": {
             "description": "Annotation not found"
+          }
+        }
+      }
+    },
+    "/annotations/{annotation_error_id}": {
+      "post": {
+        "tags": [
+          "Annotations Requests"
+        ],
+        "summary": "Choose which annotations to keep",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "annotation_error_id",
+            "description": "Annotation error ID",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "uploader",
+            "description": "Name of the uploader",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "keep",
+            "in": "query",
+            "description": "Choose which annotation to keep",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "model",
+                "human",
+                "both"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400-AnnotationErrorNotFound": {
+            "description": "Annotation error not found"
+          },
+          "400-UserNotFoundError": {
+            "description": "User not found"
           }
         }
       }
@@ -1422,7 +1475,7 @@
         "properties": {
           "x_center": {
             "type": "number",
-            "format": "float",
+            "format": "float"
           },
           "y_center": {
             "type": "number",

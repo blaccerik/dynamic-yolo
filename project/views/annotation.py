@@ -5,7 +5,7 @@ from project.models.image import Image
 from project.schemas.annotation import AnnotationSchema
 from project.schemas.annotation_upload import AnnotationUploadSchema
 from project.services.annotation_service import retrieve_annotation, change_annotation_values, \
-    delete_extra_information, remove_annotation_and_extras, create_annotation
+    delete_extra_information, remove_annotation_and_extras, create_annotation, choose_between_annotations_to_keep
 
 REQUEST_API = Blueprint('annotations', __name__, url_prefix="/annotations")
 
@@ -71,3 +71,15 @@ def add_annotation():
 
     new_id = create_annotation(data, uploader)
     return jsonify({'message': f'Annotation with ID:{new_id} added'}), 200
+
+
+@REQUEST_API.route('/<int:annotation_error_id>', methods=['POST'])
+def check_annotation_error(annotation_error_id):
+    # TODO fix error system
+    user_name = request.args.get('uploader')
+    keep_value = request.args.get('keep')
+    response = choose_between_annotations_to_keep(annotation_error_id, user_name, keep_value)
+
+    if response[0] == 0:
+        return jsonify({'message': 'ERROR'}), 400
+    return jsonify({'message': f'SUCCESS'}), 200
