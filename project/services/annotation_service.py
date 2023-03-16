@@ -36,3 +36,19 @@ def change_annotation_values(annotation_code, data):
         setattr(annotation, k, v)
     db.session.add(annotation)
     db.session.commit()
+
+
+def delete_extra_information(annotation_code):
+    annotation = Annotation.query.get(annotation_code)
+    if annotation:
+        errors = annotation.model_annotation_errors + annotation.human_annotation_errors
+        total_errors = len(errors)
+        human_errors = len(annotation.human_annotation_errors)
+        model_errors = len(annotation.model_annotation_errors)
+
+        for error in errors:
+            db.session.delete(error)
+        db.session.commit()
+    else:
+        return None
+    return total_errors, model_errors, human_errors

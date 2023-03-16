@@ -698,6 +698,33 @@
         }
       }
     },
+    "/annotations/extra/{annotation_id}": {
+      "delete": {
+        "tags": [
+          "Annotations Requests"
+        ],
+        "summary": "Remove extra information associated with an annotation",
+        "parameters": [
+          {
+            "name": "annotation_id",
+            "in": "path",
+            "description": "Annotation ID",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/annotation_id"
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Invalid annotation ID"
+          },
+          "200":{
+            "description": "Successful deletion"
+          }
+        }
+      }
+    },
     "/results": {
       "get": {
         "tags": [
@@ -897,7 +924,7 @@
             "type": "boolean",
             "default": false
           },
-           "freeze_backbone": {
+          "freeze_backbone": {
             "type": "boolean",
             "default": false
           },
