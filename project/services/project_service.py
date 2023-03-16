@@ -1,19 +1,31 @@
 from marshmallow import ValidationError
 
 from project import db
-from sqlalchemy import func, and_
-from sqlalchemy.orm import joinedload, subqueryload
+from sqlalchemy import func, and_, or_
+from sqlalchemy.orm import joinedload, subqueryload, aliased
 from project.models.annotation import Annotation
+from project.models.annotation_extra import AnnotationError
 from project.models.annotator import Annotator
 from project.models.image import Image
 from project.models.initial_model import InitialModel
 from project.models.model import Model
+from project.models.model_class_results import ModelClassResult
 from project.models.model_image import ModelImage
+from project.models.model_results import ModelResults
 from project.models.model_status import ModelStatus
 from project.models.project import Project
 from project.models.project_settings import ProjectSettings
 from project.models.project_status import ProjectStatus
 from project.models.subset import Subset
+
+class ModelStats:
+
+    def __init__(self, mr: ModelResults, mcr: ModelClassResult):
+        self.mr = mr
+        self.class_results = {mcr.class_id: mcr.confidence}
+
+    def add(self, mcr: ModelClassResult):
+        self.class_results[mcr.class_id] = mcr.confidence
 
 
 def create_project(name: str, class_nr: int, init_model: str, img_size: int) -> int:
@@ -264,3 +276,77 @@ def retrieve_annotations(project_code, page_nr, page_size):
                                       "image_id": image_id})
 
     return annotations_to_return
+
+def find_score(model_class_confidence, human_class_confidence, confidence, training_amount, mr: ModelResults):
+
+    a = 5
+    b = 7
+    c = 6
+    d = 0.1
+    e = 5
+    f = 6
+    g = 5
+    h = 6
+
+    score = model_class_confidence * a + \
+            human_class_confidence * b + \
+            confidence * c + \
+            training_amount * d + \
+            mr.metric_precision * e + \
+            mr.metric_recall * f + \
+            mr.metric_map_50 * g + \
+            mr.metric_map_50_95 * h
+    return score
+
+def retrieve_project_errors(project_code, page_nr, page_size):
+    project = Project.query.get(project_code)
+
+    if project is None:
+        raise ValidationError({"error": f"Project not found"})
+
+    # Create aliases for the Annotation table
+    a1 = aliased(Annotation)
+    a2 = aliased(Annotation)
+
+    # Perform the left join query
+    query = db.session.query(AnnotationError, a1, a2). \
+        join(a1, AnnotationError.model_annotation_id == a1.id, isouter=True). \
+        join(a2, AnnotationError.human_annotation_id == a2.id, isouter=True). \
+        filter(or_(a1.project_id == project_code, a2.project_id == project_code)).all()
+
+    # get all model results
+    ss_val = Subset.query.filter(Subset.name.like("val")).first()
+    results = db.session.query(ModelClassResult, ModelResults). \
+        join(ModelResults, ModelResults.id == ModelClassResult.model_results_id). \
+        filter(ModelResults.subset_id == ss_val.id).all()
+    model_results = {}
+    for mcr, mr in results:
+        model_id = mr.model_id
+        if model_id in model_results:
+            model_results[model_id].add(mcr)
+        else:
+            model_results[model_id] = ModelStats(mr, mcr)
+
+    weighted_results = []
+    # go through every mistake and give it a score
+    for ae, am, ah in query:
+        confidence = ae.confidence
+        if confidence is None:
+            confidence = 0
+        training_amount = ae.training_amount
+        model_id = ae.model_id
+        model_stats = model_results[model_id]
+        model_class_confidence = 0
+        if am is not None:
+            model_class_confidence = model_stats.class_results[am.class_id]
+        human_class_confidence = 0
+        if ah is not None:
+            human_class_confidence = model_stats.class_results[ah.class_id]
+        score = find_score(model_class_confidence, human_class_confidence, confidence, training_amount, model_stats.mr)
+        weighted_results.append((score, ae))
+
+    weighted_results.sort(key=lambda x: x[0], reverse=True)
+
+    start_index = (page_nr - 1) * page_size
+    end_index = start_index + page_size
+    return weighted_results[start_index:end_index]

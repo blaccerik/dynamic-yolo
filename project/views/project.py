@@ -14,7 +14,7 @@ from project.services.file_upload_service import upload_files
 from project.models.annotation import Annotation
 from project.models.image import Image
 from project.services.project_service import create_project, get_all_projects, get_project_info, \
-    change_settings, get_settings, get_images, get_models, retrieve_annotations
+    change_settings, get_settings, get_images, get_models, retrieve_annotations, retrieve_project_errors
 from project.schemas.project import Project
 from project.schemas.upload import Upload
 from project.schemas.projectsettings import ProjectSettingsSchema
@@ -218,3 +218,25 @@ def get_annotations(project_id):
 
     annotations = retrieve_annotations(project_id, page_nr, page_size)
     return jsonify(annotations), 200
+
+def weighted_result_to_dict(x):
+    score, ae = x
+    return {
+        "score": score,
+        "image": ae.image_id,
+        "model": ae.model_id,
+        "human_annotation_id": ae.human_annotation_id,
+        "model_annotation_id": ae.model_annotation_id,
+        "error_id": ae.id
+    }
+
+@REQUEST_API.route('/<int:project_id>/errors', methods=['GET'])
+def get_project_errors(project_id):
+    page_size = request.args.get("page_size")
+    page_size = validate_page_size(page_size, 20, 100)
+    page_nr = request.args.get("page_nr")
+    page_nr = validate_page_nr(page_nr)
+
+    data = retrieve_project_errors(project_id, page_nr, page_size)
+    data = [weighted_result_to_dict(x) for x in data]
+    return jsonify(data), 200

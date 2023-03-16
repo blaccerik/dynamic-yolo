@@ -262,6 +262,62 @@
         }
       }
     },
+    "/projects/{project_id}/errors": {
+      "get": {
+        "tags": [
+          "Project Requests"
+        ],
+        "summary": "Get errors for a project",
+        "description": "Get a paginated list of images for a project",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "description": "ID of the project to get images for",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "Number of images to be returned per page",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "page_nr",
+            "in": "query",
+            "description": "Page number",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A list errors for the project",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/image"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/queue": {
       "get": {
         "tags": [
@@ -346,13 +402,21 @@
             }
           },
           {
+            "name": "error_id",
+            "in": "query",
+            "description": "Show only certain error",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
             "name": "show_annotations",
             "in": "query",
             "description": "Show bounding boxes",
             "required": false,
             "schema": {
-              "type": "boolean",
-              "default": false
+              "type": "boolean"
             }
           },
           {
@@ -402,6 +466,15 @@
             "name": "image_id",
             "description": "ID of the image to retrieve",
             "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "error_id",
+            "in": "query",
+            "description": "Show only certain error",
+            "required": false,
             "schema": {
               "type": "integer"
             }

@@ -551,7 +551,6 @@ class TrainSession:
         # b - inference time
         # c - nms time
 
-        print(mr.metric_precision, mr.metric_recall, mr.metric_map_50, mr.metric_map_50_95)
         db.session.refresh(self.project)
         if self.project.times_auto_trained >= self.project_settings.maximum_auto_train_number:
             return False
