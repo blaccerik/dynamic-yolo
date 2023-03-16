@@ -696,6 +696,31 @@
             "description": "Annotation not found."
           }
         }
+      },
+      "delete": {
+        "tags": [
+          "Annotations Requests"
+        ],
+        "summary": "Delete annotation and everything related to it",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "annotation_id",
+            "description": "ID of the annotation",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/annotation_id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Succesful deletion.",
+          },
+          "400": {
+            "description": "Annotation not found."
+          }
+        }
       }
     },
     "/annotations/extra/{annotation_id}": {
@@ -719,7 +744,7 @@
           "400": {
             "description": "Invalid annotation ID"
           },
-          "200":{
+          "200": {
             "description": "Successful deletion"
           }
         }

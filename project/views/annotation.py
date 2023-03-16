@@ -2,7 +2,8 @@ from flask import Blueprint, jsonify, request
 
 from project.models.annotation import Annotation
 from project.schemas.annotation import AnnotationSchema
-from project.services.annotation_service import retrieve_annotation, change_annotation_values, delete_extra_information
+from project.services.annotation_service import retrieve_annotation, change_annotation_values, \
+    delete_extra_information, remove_annotation_and_extras
 
 REQUEST_API = Blueprint('annotations', __name__, url_prefix="/annotations")
 
@@ -38,10 +39,13 @@ def change_annotation(annotation_id):
 def remove_annotation_extras(annotation_id):
     result = delete_extra_information(annotation_id)
 
-    if result is None:
-        return jsonify({'error': 'Check the annotation ID.'}), 400
-
     if result[0] == 0:
         return jsonify({'message': f'No errors to delete'}), 200
 
+    return jsonify({'message': f'Deleted {result[1]} model and {result[2]} human error/errors.'}), 200
+
+
+@REQUEST_API.route('/<int:annotation_id>', methods=['DELETE'])
+def delete_annotation(annotation_id):
+    result = remove_annotation_and_extras(annotation_id)
     return jsonify({'message': f'Deleted {result[1]} model and {result[2]} human error/errors.'}), 200

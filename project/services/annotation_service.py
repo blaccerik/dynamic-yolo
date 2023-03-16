@@ -50,5 +50,18 @@ def delete_extra_information(annotation_code):
             db.session.delete(error)
         db.session.commit()
     else:
-        return None
+        raise ValidationError({"error": f"Annotation not found!"})
     return total_errors, model_errors, human_errors
+
+
+def remove_annotation_and_extras(annotation_code):
+    annotation = Annotation.query.get(annotation_code)
+    if annotation is None:
+        raise ValidationError({"error": f"Annotation not found"})
+
+    extras_deleted = delete_extra_information(annotation_code)
+
+    db.session.delete(annotation)
+    db.session.commit()
+
+    return extras_deleted
