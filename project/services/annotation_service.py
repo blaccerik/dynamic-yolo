@@ -65,3 +65,19 @@ def remove_annotation_and_extras(annotation_code):
     db.session.commit()
 
     return extras_deleted
+
+
+def create_annotation(data, uploader_name):
+    user_id = Annotator.query.filter(Annotator.name.like(uploader_name)).first().id
+    annotation_to_upload = Annotation(x_center=data['x_center'],
+                                      y_center=data['y_center'],
+                                      width=data['width'],
+                                      height=data['height'],
+                                      class_id=data['class_id'],
+                                      project_id=data['project_id'],
+                                      image_id=data['image_id'],
+                                      annotator_id=user_id,
+                                      )
+    db.session.add(annotation_to_upload)
+    db.session.commit()
+    return annotation_to_upload.id

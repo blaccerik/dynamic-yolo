@@ -750,6 +750,53 @@
         }
       }
     },
+    "/annotations": {
+      "post": {
+        "tags": [
+          "Annotations Requests"
+        ],
+        "summary": "Add an annotation manually.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "uploader",
+            "description": "Name of the uploader",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/post_annotation"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The updated annotation object.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/post_annotation"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request body."
+          },
+          "404": {
+            "description": "Annotation not found"
+          }
+        }
+      }
+    },
     "/results": {
       "get": {
         "tags": [
@@ -1368,6 +1415,46 @@
           "val_box_loss",
           "val_obj_loss",
           "val_cls_loss"
+        ]
+      },
+      "post_annotation": {
+        "type": "object",
+        "properties": {
+          "x_center": {
+            "type": "number",
+            "format": "float",
+          },
+          "y_center": {
+            "type": "number",
+            "format": "float"
+          },
+          "width": {
+            "type": "number",
+            "format": "float"
+          },
+          "height": {
+            "type": "number",
+            "format": "float"
+          },
+          "class_id": {
+            "type": "integer"
+          },
+          "project_id": {
+            "type": "integer"
+          },
+          "image_id": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "x_center",
+          "y_center",
+          "width",
+          "height",
+          "class_id",
+          "project_id",
+          "image_id"
         ]
       }
     }

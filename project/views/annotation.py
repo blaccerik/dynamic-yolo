@@ -2,8 +2,9 @@ from flask import Blueprint, jsonify, request
 
 from project.models.annotation import Annotation
 from project.schemas.annotation import AnnotationSchema
+from project.schemas.annotation_upload import AnnotationUploadSchema
 from project.services.annotation_service import retrieve_annotation, change_annotation_values, \
-    delete_extra_information, remove_annotation_and_extras
+    delete_extra_information, remove_annotation_and_extras, create_annotation
 
 REQUEST_API = Blueprint('annotations', __name__, url_prefix="/annotations")
 
@@ -49,3 +50,17 @@ def remove_annotation_extras(annotation_id):
 def delete_annotation(annotation_id):
     result = remove_annotation_and_extras(annotation_id)
     return jsonify({'message': f'Deleted {result[1]} model and {result[2]} human error/errors.'}), 200
+
+
+@REQUEST_API.route('/', methods=['POST'])
+def add_annotation():
+    data = request.json
+    uploader = request.args.get("uploader")
+    data['uploader'] = uploader
+
+    errors = AnnotationUploadSchema().validate(data)
+    if errors:
+        return jsonify({'error': f'Please check the following fields: {errors}'}), 400
+
+    new_id = create_annotation(data, uploader)
+    return jsonify({'message': f'Annotation with ID:{new_id} added'}), 200
