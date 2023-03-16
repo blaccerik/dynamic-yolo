@@ -1148,10 +1148,6 @@
           "id": {
             "type": "integer"
           },
-          "confidence": {
-            "type": "number",
-            "format": "float"
-          },
           "x_center": {
             "type": "number",
             "format": "float"
