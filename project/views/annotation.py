@@ -81,5 +81,5 @@ def check_annotation_error(annotation_error_id):
     response = choose_between_annotations_to_keep(annotation_error_id, user_name, keep_value)
 
     if response[0] == 0:
-        return jsonify({'message': 'ERROR'}), 400
+        return jsonify({'error': response[1]}), 400
     return jsonify({'message': f'SUCCESS'}), 200
