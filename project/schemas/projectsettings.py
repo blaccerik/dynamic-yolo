@@ -5,7 +5,8 @@ class ProjectSettingsSchema(Schema):
     epochs = fields.Integer(required=False)
     batch_size = fields.Integer(required=False)
 
-    train_test_ratio = fields.Float(required=False)
+    train_ratio = fields.Integer(required=False)
+    val_ratio = fields.Integer(required=False)
     pretest_size_difference_threshold = fields.Float(required=False)
     maximum_auto_train_number = fields.Integer(required=False)
     skip_pretesting = fields.Boolean(required=False)
@@ -30,7 +31,6 @@ class ProjectSettingsSchema(Schema):
             raise ValidationError("too small", "batch_size")
 
         self.in_range("confidence_threshold", data)
-        self.in_range("train_test_ratio", data)
         self.in_range("minimal_map_50_threshold", data)
         self.in_range("min_confidence_threshold", data)
         self.in_range("min_iou_threshold", data)
