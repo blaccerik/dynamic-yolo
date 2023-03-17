@@ -769,6 +769,158 @@
             "description": "Annotation not found."
           }
         }
+      },
+      "delete": {
+        "tags": [
+          "Annotations Requests"
+        ],
+        "summary": "Delete annotation and everything related to it",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "annotation_id",
+            "description": "ID of the annotation",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/annotation_id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Succesful deletion."
+          },
+          "400": {
+            "description": "Annotation not found."
+          }
+        }
+      }
+    },
+    "/annotations/extra/{annotation_id}": {
+      "delete": {
+        "tags": [
+          "Annotations Requests"
+        ],
+        "summary": "Remove extra information associated with an annotation",
+        "parameters": [
+          {
+            "name": "annotation_id",
+            "in": "path",
+            "description": "Annotation ID",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/annotation_id"
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Invalid annotation ID"
+          },
+          "200": {
+            "description": "Successful deletion"
+          }
+        }
+      }
+    },
+    "/annotations": {
+      "post": {
+        "tags": [
+          "Annotations Requests"
+        ],
+        "summary": "Add an annotation manually.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "uploader",
+            "description": "Name of the uploader",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/post_annotation"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The updated annotation object.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/post_annotation"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request body."
+          },
+          "404": {
+            "description": "Annotation not found"
+          }
+        }
+      }
+    },
+    "/annotations/{annotation_error_id}": {
+      "post": {
+        "tags": [
+          "Annotations Requests"
+        ],
+        "summary": "Choose which annotations to keep",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "annotation_error_id",
+            "description": "Annotation error ID",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "uploader",
+            "description": "Name of the uploader",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "keep",
+            "in": "query",
+            "description": "Choose which annotation to keep",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "model",
+                "human",
+                "both"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400-AnnotationErrorNotFound": {
+            "description": "Annotation error not found"
+          },
+          "400-UserNotFoundError": {
+            "description": "User not found"
+          }
+        }
       }
     },
     "/results": {
@@ -970,7 +1122,7 @@
             "type": "boolean",
             "default": false
           },
-           "freeze_backbone": {
+          "freeze_backbone": {
             "type": "boolean",
             "default": false
           },
@@ -1221,10 +1373,6 @@
           "id": {
             "type": "integer"
           },
-          "confidence": {
-            "type": "number",
-            "format": "float"
-          },
           "x_center": {
             "type": "number",
             "format": "float"
@@ -1393,6 +1541,42 @@
           "val_box_loss",
           "val_obj_loss",
           "val_cls_loss"
+        ]
+      },
+      "post_annotation": {
+        "type": "object",
+        "properties": {
+          "x_center": {
+            "type": "number",
+            "format": "float"
+          },
+          "y_center": {
+            "type": "number",
+            "format": "float"
+          },
+          "width": {
+            "type": "number",
+            "format": "float"
+          },
+          "height": {
+            "type": "number",
+            "format": "float"
+          },
+          "class_id": {
+            "type": "integer"
+          },
+          "image_id": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "x_center",
+          "y_center",
+          "width",
+          "height",
+          "class_id",
+          "image_id"
         ]
       }
     }
