@@ -149,7 +149,7 @@ def upload(project_id: int):
         return jsonify({'error': f'Please check the following fields: {errors}'}), 400
 
     uploader = data["uploader_name"]
-    split = data["split"]
+    split = data["split_name"]
     files = request.files.getlist("files")
     if files is None:
         return jsonify({'error': f'Files field not found'}), 400

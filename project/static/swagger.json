@@ -1079,7 +1079,7 @@
             "type": "string",
             "format": "string"
           },
-          "split": {
+          "split_name": {
             "type": "string",
             "enum": [
               "train",
@@ -1108,9 +1108,13 @@
             "type": "integer",
             "description": "Batch size for training"
           },
-          "train_test_ratio": {
+          "train_ratio": {
             "type": "number",
-            "description": "Training and testing data split ratio"
+            "description": "Training  data split ratio"
+          },
+          "val_ratio": {
+            "type": "number",
+            "description": "Validation data split ratio"
           },
           "pretest_size_difference": {
             "type": "number"
@@ -1172,7 +1176,10 @@
             "type": "string",
             "format": "string"
           },
-          "train_test_ratio": {
+          "train_ratio": {
+            "type": "integer"
+          },
+          "val_ratio": {
             "type": "integer"
           },
           "pretest_size_difference_threshold": {
