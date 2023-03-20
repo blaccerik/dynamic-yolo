@@ -171,8 +171,17 @@ def upload_files(files: list, project_code: int, uploader: str, split: str) -> (
     passed_images_number, annotations_number = _upload_images(passed_images, project.id, annotator.id, ps, split)
     failed_images_number, _ = _upload_images(failed_images, unknown_project.id, annotator.id, ps, split)
 
+    task_name = ""
+    if (split == "train" or split == "random") and ps.always_check:
+        task_name = "check"
+    if split == "train" or split == "random":
+        task_name = task_name + "train"
+    if (split == "train" or split == "random") and ps.always_test:
+        task_name = task_name + "test"
+
     # add to queue
-    add_to_queue(project.id)
+    if task_name != "":
+        add_to_queue(project.id, task_name)
     return passed_images_number, failed_images_number, annotations_number
 
 

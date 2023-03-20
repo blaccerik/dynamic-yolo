@@ -9,7 +9,7 @@ import cv2
 import numpy as np
 import torch
 import yaml
-from sqlalchemy import and_, func
+from sqlalchemy import and_, func, or_
 
 from project import db, APP_ROOT_PATH, DB_READ_BATCH_SIZE, NUMBER_OF_YOLO_WORKERS
 from project.models.annotation import Annotation
@@ -26,9 +26,11 @@ from project.models.model_status import ModelStatus
 from project.models.project import Project
 from project.models.project_settings import ProjectSettings
 from project.models.subset import Subset
+from project.models.task import Task
 from project.services.user_service import create_user
 from project.yolo.yolov5.utils.augmentations import letterbox
 from project.yolo.yolov5.utils.general import scale_boxes, xyxy2xywh
+
 
 class Prediction:
 
@@ -36,37 +38,36 @@ class Prediction:
         self.annotation = annotation
         self.conf = conf
 
+
 class SqlStream:
 
-    def __init__(self, project_id, project_settings, ss_val_id, ss_test_id, ss_train_id, db_model):
+    def __init__(self, project_id, project_settings, ss_val_id, ss_test_id, ss_train_id):
         self.project_id = project_id
         self.project_settings = project_settings
         self.ss_val_id = ss_val_id
         self.ss_test_id = ss_test_id
         self.ss_train_id = ss_train_id
-        self.db_model = db_model
+        self.db_model = None
 
-        self.best = None
+        self.best_model_weights = None
         self.good_images = set()
 
         # yolo dataloader
-        self.img_size = [640, 640]
+        self.img_size = [project_settings.img_size, project_settings.img_size]
         self.stride = 32
         self.auto = True
-
 
     def save_best(self, ckpt):
 
         buffer = io.BytesIO()
         torch.save(ckpt, buffer)
-        self.best = buffer.getvalue()
+        self.best_model_weights = buffer.getvalue()
 
     def get_all_train_images(self):
         images = Image.query.filter(and_(
             Image.project_id == self.project_id,
             Image.subset_id == self.ss_train_id
         ))
-        c = 0
 
         batch_size = DB_READ_BATCH_SIZE
         start_idx = 0
@@ -102,6 +103,8 @@ class SqlStream:
             subset_id = self.ss_val_id
         elif subset == "test":
             subset_id = self.ss_test_id
+        else:
+            raise RuntimeError("unknown subset")
         metric_precision, metric_recall, metric_map_50, metric_map_50_95, val_box_loss, val_obj_loss, val_cls_loss = results
 
         # save results
@@ -134,7 +137,6 @@ class SqlStream:
         return math.sqrt((p1.x_center - p.annotation.x_center) ** 2 + (p1.y_center - p.annotation.y_center) ** 2)
 
     def find_mappings(self, annotations, predictions):
-        # print("m", len(annotations), len(predictions))
         mappings = []
 
         if len(annotations) == 0:
@@ -146,6 +148,8 @@ class SqlStream:
         for prediction in sorted(predictions,
                                  key=lambda p: self.distance(min(annotations, key=lambda a: self.distance(a, p)), p)):
             closest_ano = min(annotations, key=lambda a: self.distance(a, prediction))
+            # todo if distance is too large then add as seperate anos
+
             annotations.remove(closest_ano)
             mappings.append((prediction, closest_ano))
             if len(annotations) == 0:
@@ -173,6 +177,7 @@ class SqlStream:
 
     def normalize_preds(self, pred, im0, im, image_id):
 
+        # find all human annotations
         annotations = Annotation.query.filter(and_(
             Annotation.project_id == self.project_id,
             Annotation.image_id == image_id,
@@ -199,7 +204,6 @@ class SqlStream:
                 # Rescale boxes from img_size to im0 size
                 det[:, :4] = scale_boxes(im.shape[2:], det[:, :4], im0.shape).round()
                 for *xyxy, conf, cls in reversed(det):
-
                     xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
                     # line = (cls, *xywh, conf)
                     class_nr = cls.item()
@@ -219,7 +223,7 @@ class SqlStream:
                     )
                     db.session.add(ano)
 
-                    predictions.append(Prediction(ano,conf))
+                    predictions.append(Prediction(ano, conf))
 
         db.session.flush()
         mappings = self.find_mappings(annotations, predictions)
@@ -258,7 +262,12 @@ class TrainSession:
                  name: str,
                  ss_test_id: int,
                  ss_train_id: int,
-                 ss_val_id: int):
+                 ss_val_id: int,
+                 task_name: str):
+        self.initial_model_name = name
+        self.initial_model_yaml = None
+        self.is_new_model = True
+
         self.ms_train = ModelStatus.query.filter(ModelStatus.name.like("training")).first()
         self.ms_test = ModelStatus.query.filter(ModelStatus.name.like("testing")).first()
         self.ms_ready = ModelStatus.query.filter(ModelStatus.name.like("ready")).first()
@@ -268,58 +277,34 @@ class TrainSession:
         self.ss_train_id = ss_train_id
         self.ss_val_id = ss_val_id
 
-        # create new model
-        self.db_model = Model(model_status_id=self.ms_test.id, project_id=project.id, epochs=project_settings.epochs)
+        self.skip_check = "check" not in task_name
+        self.skip_train = "train" not in task_name
+        self.skip_test = "test" not in task_name
 
-        self.prev_model = None
-        self.yaml = None
-
-        total = 0
-        prev_model_id = project.latest_model_id
-        if prev_model_id is not None:  # use prev model
-            prev_model = Model.query.get(prev_model_id)
-            model = prev_model.model
-            if model is None:  # model "exists" but weights are none
-                self.new_model = True
-            else:
-                self.prev_model = model
-                total = prev_model.total_epochs
-                self.new_model = False
-                self.db_model.parent_model_id = prev_model_id
-                #
-                # with open(f"{APP_ROOT_PATH}/yolo/data/weights.pt", "wb") as binary_file:
-                #     binary_file.write(self.prev_model)
+        latest_model_id = project.latest_model_id
+        if latest_model_id is None:
+            self.db_prev_model = None
         else:
-            self.new_model = True
-
-        self.db_model.total_epochs = total + project_settings.epochs
-
-        # update database
-        db.session.add(self.db_model)
-        db.session.commit()
+            self.db_prev_model = Model.query.get(latest_model_id)
+        self.db_new_model = None
         self.project = project
         self.project_settings = project_settings
 
-        self.good_images = set()
+        self.stream = SqlStream(
+            self.project.id,
+            self.project_settings,
+            self.ss_val_id,
+            self.ss_test_id,
+            self.ss_train_id)
 
-        # modify yolo backbone
-        if self.new_model:
-            with open(f"{APP_ROOT_PATH}/yolo/yolov5/models/{name}.yaml", "r") as stream:
-                yaml_file = yaml.safe_load(stream)
-                yaml_file["nc"] = self.project_settings.max_class_nr
-            self.yaml = yaml_file
-            with open(f'{APP_ROOT_PATH}/yolo/data/backbone.yaml', 'w') as outfile:
-                yaml.dump(yaml_file, outfile, default_flow_style=False)
-
-        # create a annotator
-        # name = f"project_{self.project.id}_model_{self.db_model.id}"
-        # user_id = create_user(name)
-        self.stream = SqlStream(self.project.id, self.project_settings, self.ss_val_id, self.ss_test_id, self.ss_train_id, self.db_model)
-
-
-    def pretest(self):
-        if self.new_model:
+    def check(self):
+        print("check")
+        if self.skip_check or self.db_prev_model is None or self.db_prev_model.model is None:
             return
+        self.db_prev_model.model_status_id = self.ms_test.id
+        db.session.add(self.db_prev_model)
+        db.session.commit()
+        self.stream.db_model = self.db_prev_model
 
         # set logging to warning to see much less info at console
         logging.getLogger("yolov5").setLevel(logging.ERROR)
@@ -329,9 +314,6 @@ class TrainSession:
 
         setattr(opt, "weights", f"{APP_ROOT_PATH}/yolo/data/weights.pt")
         setattr(opt, "source", f"{APP_ROOT_PATH}/yolo/data/pretest_images")
-        # setattr(opt, "nosave", True)
-        # setattr(opt, "save_txt", True)
-        # setattr(opt, "save_conf", True)
         setattr(opt, "conf_thres", self.project_settings.min_confidence_threshold)
         setattr(opt, "iou_thres", self.project_settings.min_iou_threshold)
         setattr(opt, "imgsz", [self.project_settings.img_size, self.project_settings.img_size])
@@ -340,7 +322,7 @@ class TrainSession:
         setattr(opt, "name", "yolo_test")
 
         # load model
-        setattr(opt, "binary_weights", self.prev_model)
+        setattr(opt, "binary_weights", self.db_prev_model.model)
 
         # load sql stream
         setattr(opt, "sql_stream", self.stream)
@@ -348,14 +330,89 @@ class TrainSession:
         # run model
         detect.main(opt)
 
-    def load_yaml(self):
+        self.db_prev_model.model_status_id = self.ms_ready.id
+        db.session.add(self.db_prev_model)
+        db.session.commit()
+
+    def __init_new_db_model__(self, project, project_settings):
+        # create new model
+        self.db_new_model = Model(model_status_id=self.ms_train.id,
+                                  project_id=project.id,
+                                  epochs=project_settings.epochs)
+
+        total = 0
+        if self.db_prev_model is not None and self.db_prev_model.model is not None:  # use prev model
+            total = self.db_prev_model.total_epochs
+            self.db_new_model.parent_model_id = self.db_prev_model.id
+            self.is_new_model = False
+
+        self.db_new_model.total_epochs = total + project_settings.epochs
+        # update database
+        db.session.add(self.db_new_model)
+        db.session.commit()
+
+    def load_model(self):
+        self.__init_new_db_model__(self.project, self.project_settings)
+        if self.is_new_model:
+            # modify yolo backbone
+            with open(f"{APP_ROOT_PATH}/yolo/yolov5/models/{self.initial_model_name}.yaml", "r") as stream:
+                yaml_file = yaml.safe_load(stream)
+                yaml_file["nc"] = self.project_settings.max_class_nr
+                self.initial_model_yaml = yaml_file
+            with open(f'{APP_ROOT_PATH}/yolo/data/backbone.yaml', 'w') as outfile:
+                yaml.dump(yaml_file, outfile, default_flow_style=False)
+
+    def load_train_data(self):
+
+        # load data
+        images = Image.query.filter(
+            and_(Image.project_id == self.project.id,
+                 or_(
+                     Image.subset_id == self.ss_train_id,
+                     Image.subset_id == self.ss_val_id
+                 )))
+
+        for image in images.yield_per(DB_READ_BATCH_SIZE):
+            if image.subset_id == self.ss_train_id:
+                if image.id in self.stream.good_images:
+                    continue
+                location = f"{APP_ROOT_PATH}/yolo/data/train"
+            elif image.subset_id == self.ss_val_id:
+                location = f"{APP_ROOT_PATH}/yolo/data/val"
+            else:
+                raise RuntimeError("wrogn subset id")
+
+            # save image
+            content = image.image
+            with open(f"{location}/images/{image.id}.png", "wb") as binary_file:
+                binary_file.write(content)
+
+            annotations = Annotation.query.filter(and_(
+                Annotation.project_id == self.project.id,
+                Annotation.image_id == image.id,
+                Annotation.annotator_id != None
+            ))
+            text = ""
+            # save label
+            for a in annotations:
+                line = f"{a.class_id} {a.x_center} {a.y_center} {a.width} {a.height}\n"
+                text += line
+            with open(f"{location}/labels/{image.id}.txt", "w") as text_file:
+                text_file.write(text)
+
+            # create db entry
+            mi = ModelImage(model_id=self.db_new_model.id, image_id=image.id)
+            db.session.add(mi)
+
+        db.session.commit()
+
+    def load_train_yaml(self):
         # create yaml file
         data = {
             "path": f"{APP_ROOT_PATH}/yolo/data",
+            "names": {},
             "train": "train",
-            "val": "val",
-            "test": "test",
-            "names": {}
+            "val": "val"
         }
 
         # if possible add names to
@@ -366,81 +423,18 @@ class TrainSession:
             else:
                 data["names"][i] = image_class.name
 
-        with open(f'{APP_ROOT_PATH}/yolo/data/data.yaml', 'w') as outfile:
+        with open(f'{APP_ROOT_PATH}/yolo/data/train_data.yaml', 'w') as outfile:
             yaml.dump(data, outfile, default_flow_style=False)
 
-    def load_data(self):
-
-        # get images
-        # todo only select images with certain timestamp
-        # todo resize image to correct size
-        images = Image.query.filter(Image.project_id == self.project.id)
-
-
-        # filter out "good" images
-        has_train = False
-        has_test = False
-        print("skipping", len(self.stream.good_images))
-        for image in images.yield_per(DB_READ_BATCH_SIZE):
-            if has_train and has_test:
-                break
-
-            # skip confident images
-            if image.id in self.good_images:
-                continue
-
-            if image.subset_id == self.ss_train_id:
-                # if has_train:
-                #     continue
-                # has_train = True
-                if image.id in self.stream.good_images:
-                    continue
-                location = f"{APP_ROOT_PATH}/yolo/data/train"
-            elif image.subset_id == self.ss_test_id:
-                # if has_test:
-                #     continue
-                # has_test = True
-                location = f"{APP_ROOT_PATH}/yolo/data/test"
-            elif image.subset_id == self.ss_val_id:
-                # if has_test:
-                #     continue
-                # has_test = True
-                location = f"{APP_ROOT_PATH}/yolo/data/val"
-            else:
-                print(image.subset_id, self.ss_train_id, self.ss_test_id)
-                raise RuntimeError("subset id not found")
-
-            # save image
-            content = image.image
-            with open(f"{location}/images/{image.id}.png", "wb") as binary_file:
-                binary_file.write(content)
-
-            annotations = Annotation.query.filter(and_(
-                Annotation.project_id==self.project.id,
-                Annotation.image_id==image.id,
-                Annotation.annotator_id!=None
-            ))
-            text = ""
-
-            # save label
-            for a in annotations:
-                line = f"{a.class_id} {a.x_center} {a.y_center} {a.width} {a.height}\n"
-                text += line
-            with open(f"{location}/labels/{image.id}.txt", "w") as text_file:
-                text_file.write(text)
-
-            # create db entry
-            mi = ModelImage(model_id=self.db_model.id, image_id=image.id)
-            db.session.add(mi)
-
-        db.session.commit()
-
     def train(self):
-
-        # update database
-        self.db_model.model_status_id = self.ms_train.id
-        db.session.add(self.db_model)
-        db.session.commit()
+        print("train")
+        if self.skip_train:
+            return False
+        # load data
+        self.load_model()
+        self.load_train_yaml()
+        self.load_train_data()
+        self.stream.db_model = self.db_new_model
 
         # set logging to warning to see much less info at console
         # logging.getLogger("utils.general").setLevel(logging.WARNING)  # yolov5 logger
@@ -450,7 +444,7 @@ class TrainSession:
         opt = train.parse_opt(True)
 
         # change some values
-        setattr(opt, "data", f"{APP_ROOT_PATH}/yolo/data/data.yaml")
+        setattr(opt, "data", f"{APP_ROOT_PATH}/yolo/data/train_data.yaml")
         setattr(opt, "batch_size", self.project_settings.batch_size)
         setattr(opt, "imgsz", self.project_settings.img_size)
         setattr(opt, "epochs", self.project_settings.epochs)
@@ -464,50 +458,106 @@ class TrainSession:
             setattr(opt, "cache", "ram")
         # setattr(opt, "cache", "disk")  # dont use disk cache, super slow
         setattr(opt, "workers", NUMBER_OF_YOLO_WORKERS)
-
-        if self.new_model:
+        print("new model", self.is_new_model)
+        if self.is_new_model:
             setattr(opt, "weights", "")
             setattr(opt, "cfg", f"{APP_ROOT_PATH}/yolo/data/backbone.yaml")
+            w = None
         else:
             setattr(opt, "weights", f"{APP_ROOT_PATH}/yolo/data/weights.pt")
+            w = self.db_prev_model.model
             if self.project_settings.freeze_backbone:
                 setattr(opt, "freeze", [10])
             setattr(opt, "cfg", "")
 
-        # add model id to opt
-        # setattr(opt, "db_model_id", self.db_model.id)
-        # setattr(opt, "db_train_subset_id", self.ss_train_id)
-
         try:
-            train.main(opt, binary_weights=self.prev_model, yaml_dict=self.yaml, sql_stream=self.stream)  # long process
+            train.main(opt, binary_weights=w, yaml_dict=self.initial_model_yaml, sql_stream=self.stream)  # long process
         except torch.cuda.OutOfMemoryError as e:
             print("out of gpu memory")
             print(e)
-            self.db_model.model_status_id = self.ms_error.id
-            db.session.add(self.db_model)
+            self.db_new_model.model_status_id = self.ms_error.id
+            db.session.add(self.db_new_model)
             db.session.commit()
             return True
         except cv2.error as e:
             print("out of ram")
             print(e)
-            self.db_model.model_status_id = self.ms_error.id
-            db.session.add(self.db_model)
+            self.db_new_model.model_status_id = self.ms_error.id
+            db.session.add(self.db_new_model)
             db.session.commit()
             return True
 
-        # # read model weights
-        # with open(f"{APP_ROOT_PATH}/yolo/data/model/yolo_train/weights/best.pt", "rb") as f:
-        #     content = f.read()
-        #     self.db_model.model = content
-        self.db_model.model = self.stream.best
+        self.db_new_model.model = self.stream.best_model_weights
+        self.db_new_model.model_status_id = self.ms_ready.id
+        db.session.add(self.db_new_model)
+        db.session.commit()
         return False
 
-    def test(self):
+    def load_test_yaml(self):
+        # create yaml file
+        data = {
+            "path": f"{APP_ROOT_PATH}/yolo/data",
+            "names": {},
+            "test": "test"
+        }
 
-        # update database
-        self.db_model.model_status_id = self.ms_test.id
-        db.session.add(self.db_model)
+        # if possible add names to
+        for i in range(self.project_settings.max_class_nr):
+            image_class = ImageClass.query.get((self.project.id, i))
+            if image_class is None:
+                data["names"][i] = i
+            else:
+                data["names"][i] = image_class.name
+
+        with open(f'{APP_ROOT_PATH}/yolo/data/test_data.yaml', 'w') as outfile:
+            yaml.dump(data, outfile, default_flow_style=False)
+
+    def load_test_data(self):
+
+        # load data
+        images = Image.query.filter(and_(
+            Image.project_id == self.project.id,
+            Image.subset_id == self.ss_test_id,
+        ))
+
+        for image in images.yield_per(DB_READ_BATCH_SIZE):
+            location = f"{APP_ROOT_PATH}/yolo/data/test"
+
+            # save image
+            content = image.image
+            with open(f"{location}/images/{image.id}.png", "wb") as binary_file:
+                binary_file.write(content)
+
+            annotations = Annotation.query.filter(and_(
+                Annotation.project_id == self.project.id,
+                Annotation.image_id == image.id,
+                Annotation.annotator_id != None
+            ))
+            text = ""
+            # save label
+            for a in annotations:
+                line = f"{a.class_id} {a.x_center} {a.y_center} {a.width} {a.height}\n"
+                text += line
+            with open(f"{location}/labels/{image.id}.txt", "w") as text_file:
+                text_file.write(text)
+
+    def test(self):
+        print("test")
+        if self.skip_test:
+            return False
+        if self.db_new_model is None or self.db_new_model.model is None:
+            if self.db_prev_model is None or self.db_prev_model.model is None:
+                return False
+            else:
+                self.db_new_model = self.db_prev_model
+
+        self.db_new_model.model_status_id = self.ms_test.id
+        db.session.add(self.db_new_model)
         db.session.commit()
+        self.stream.db_model = self.db_new_model
+
+        self.load_test_yaml()
+        self.load_test_data()
 
         # set logging to warning to see much less info at console
         logging.getLogger("yolov5").setLevel(logging.ERROR)
@@ -516,7 +566,7 @@ class TrainSession:
         opt = val.parse_opt(True)
 
         setattr(opt, "weights", f"{APP_ROOT_PATH}/yolo/data/model/yolo_train/weights/best.pt")
-        setattr(opt, "data", f"{APP_ROOT_PATH}/yolo/data/data.yaml")
+        setattr(opt, "data", f"{APP_ROOT_PATH}/yolo/data/test_data.yaml")
         setattr(opt, "task", "test")
         setattr(opt, "project", f"{APP_ROOT_PATH}/yolo/data/results")
         setattr(opt, "name", "yolo_test")
@@ -524,26 +574,14 @@ class TrainSession:
 
         setattr(opt, "batch_size", self.project_settings.batch_size)
         setattr(opt, "imgsz", self.project_settings.img_size)
-        # setattr(opt, "source", "app/yolo/data/test")
-        # setattr(opt, "nosave", True)
-        # setattr(opt, "project", "app/yolo/data/results")
-        # setattr(opt, "name", "yolo_test")
-        # setattr(opt, "save_txt", True)
-        # setattr(opt, "save_conf", True)
-        if self.stream.best is None:
-            setattr(opt, "binary_weights", self.prev_model)
-        else:
-            setattr(opt, "binary_weights", self.stream.best)
-
-
+        setattr(opt, "binary_weights", self.db_new_model.model)
         # run model
-        # todo dont save results
         settings = vars(opt)
         try:
             results, maps, t = val.run(**settings)
         except (torch.cuda.OutOfMemoryError, RuntimeError):
-            self.db_model.model_status_id = self.ms_error.id
-            db.session.add(self.db_model)
+            self.db_new_model.model_status_id = self.ms_error.id
+            db.session.add(self.db_new_model)
             db.session.commit()
             return True
         mr = self.stream.add_results_to_db(results, maps, "test")
@@ -552,7 +590,16 @@ class TrainSession:
         # b - inference time
         # c - nms time
 
+        self.db_new_model.model_status_id = self.ms_ready.id
+        db.session.add(self.db_new_model)
+        db.session.commit()
+
+        # dont auto train when it didnt train
+        if not self.skip_train:
+            return False
+
         db.session.refresh(self.project)
+        db.session.refresh(self.project_settings)
         if self.project.times_auto_trained >= self.project_settings.maximum_auto_train_number:
             return False
 
@@ -565,20 +612,25 @@ class TrainSession:
                            mr.metric_precision < self.project_settings.minimal_recall_threshold
 
         if needs_auto_train:
-            add_to_queue(self.project.id, False)
+            task_name = ""
+            if self.project_settings.always_check:
+                task_name = "check"
+            task_name = task_name + "train"
+            if self.project_settings.always_test:
+                task_name = task_name + "test"
+            add_to_queue(self.project.id, task_name, reset_counter=False)
         return False
 
     def cleanup(self):
-        # if os.path.exists("project/yolo/data"):
-        #     shutil.rmtree("project/yolo/data")
-
         # update model
-        self.db_model.model_status_id = self.ms_ready.id
-        self.project.latest_model_id = self.db_model.id
-        self.project.times_auto_trained += 1
-        db.session.add(self.db_model)
+        if self.db_new_model is not None:
+            self.project.latest_model_id = self.db_new_model.id
+            db.session.add(self.db_new_model)
+        if not self.skip_train:
+            self.project.times_auto_trained += 1
         db.session.add(self.project)
         db.session.commit()
+
 
 def initialize_yolo_folders():
     """
@@ -611,12 +663,13 @@ def initialize_yolo_folders():
     create_path(f"{APP_ROOT_PATH}/yolo/data/results")
     create_path(f"{APP_ROOT_PATH}/yolo/data/model")
 
+
 def create_path(path):
     if not os.path.exists(path):
         os.mkdir(path)
 
 
-def start_training(project: Project) -> bool:
+def start_training(project: Project, task_id: int) -> bool:
     """
     Start yolo training session with the latest data
     :returns
@@ -631,6 +684,11 @@ def start_training(project: Project) -> bool:
     # check if backbone file is present
     name = InitialModel.query.get(project_settings.initial_model_id).name
     if not os.path.isfile(f"{APP_ROOT_PATH}/yolo/yolov5/models/{name}.yaml"):
+        return True
+
+    # check task
+    task = Task.query.get(task_id)
+    if task is None:
         return True
 
     # check if project has test and train data
@@ -650,13 +708,13 @@ def start_training(project: Project) -> bool:
         Image.project_id == project.id,
         Image.subset_id == ss_val.id
     )).first()
-
-    # todo set minimum data amounts
-    if test_image is None:
+    if "check" in task.name and train_image is None:
         return False
-    if train_image is None:
+    if "train" in task.name and train_image is None:
         return False
-    if val_image is None:
+    if "train" in task.name and val_image is None:
+        return False
+    if "test" in task.name and test_image is None:
         return False
 
     # clear dirs
@@ -664,26 +722,21 @@ def start_training(project: Project) -> bool:
         shutil.rmtree(f"{APP_ROOT_PATH}/yolo/data")
     initialize_yolo_folders()
     print(datetime.datetime.now())
-    print("ts 1")
-    ts = TrainSession(project, project_settings, name, ss_test.id, ss_train.id, ss_val.id)
-    print("ts 3")
-    ts.pretest()
-    print("ts 4")
-    ts.load_yaml()
-    print("ts 5")
-    ts.load_data()
-    print("ts 6")
+    ts = TrainSession(project, project_settings, name, ss_test.id, ss_train.id, ss_val.id, task.name)
+
+    ts.check()
+
     error = ts.train()
     if error:
         print("Out of memory while training")
         return True
-    print("ts 7")
     error = ts.test()
     if error:
         print("Out of memory while testing")
         return True
     print("ts 8")
+
     ts.cleanup()
     print(datetime.datetime.now())
-    return False
 
+    return False

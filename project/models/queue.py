@@ -7,3 +7,4 @@ from project import db
 class Queue(db.Model):
     position = Column(Integer, primary_key=True, autoincrement=False)
     project_id = Column(BigInteger, ForeignKey('project.id'), nullable=False)
+    task_id = Column(Integer, ForeignKey('task.id'), nullable=False)

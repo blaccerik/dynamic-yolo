@@ -356,6 +356,13 @@
                 "properties": {
                   "project_id": {
                     "type": "integer"
+                  },
+                  "tasks": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": ["train", "test", "check"]
+                    }
                   }
                 },
                 "required": [
