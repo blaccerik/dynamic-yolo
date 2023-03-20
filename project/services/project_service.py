@@ -18,6 +18,7 @@ from project.models.project_settings import ProjectSettings
 from project.models.project_status import ProjectStatus
 from project.models.subset import Subset
 
+
 class ModelStats:
 
     def __init__(self, mr: ModelResults, mcr: ModelClassResult):
@@ -200,7 +201,8 @@ def get_settings(project_code: int) -> dict:
         "img_size": project_settings.img_size,
         "initial_model": name,
 
-        # "train_test_ratio": project_settings.train_test_ratio,
+        "train_ratio": project_settings.train_ratio,
+        "val_ratio": project_settings.val_ratio,
         "pretest_size_difference_threshold": project_settings.pretest_size_difference_threshold,
         "maximum_auto_train_number": project_settings.maximum_auto_train_number,
         "skip_pretesting": project_settings.skip_pretesting,
@@ -277,6 +279,7 @@ def retrieve_annotations(project_code, page_nr, page_size):
 
     return annotations_to_return
 
+
 def find_score(model_class_confidence, human_class_confidence, confidence, training_amount, mr: ModelResults):
 
     a = 5
@@ -297,6 +300,7 @@ def find_score(model_class_confidence, human_class_confidence, confidence, train
             mr.metric_map_50 * g + \
             mr.metric_map_50_95 * h
     return score
+
 
 def retrieve_project_errors(project_code, page_nr, page_size):
     project = Project.query.get(project_code)
