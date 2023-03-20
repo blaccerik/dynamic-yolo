@@ -1,9 +1,11 @@
 from sqlalchemy import func, asc
 
 from project import db
+from project.models.project_settings import ProjectSettings
 from project.models.project_status import ProjectStatus
 from project.models.project import Project
 from project.models.queue import Queue
+from project.models.task import Task
 from project.services.training_service import start_training
 
 
@@ -55,7 +57,7 @@ def update_queue(app):
             return
 
         # train
-        error = start_training(project)
+        error = start_training(project, first.task_id)
         if error:
             new_ps = ProjectStatus.query.filter(ProjectStatus.name.like("error")).first()
         else:
@@ -66,7 +68,7 @@ def update_queue(app):
         db.session.commit()
 
 
-def add_to_queue(project_id: int, reset_counter=True):
+def add_to_queue(project_id: int, task_name: str, reset_counter=True):
     """
     Add project to query
     """
@@ -82,7 +84,12 @@ def add_to_queue(project_id: int, reset_counter=True):
     position = db.session.query(func.max(Queue.position)).scalar()
     if position is None:
         position = 0
-    q = Queue(position=position + 1, project_id=project.id)
+
+    task = Task.query.filter(Task.name.like(task_name)).first()
+    if task is None:
+        return "Task not found", 1
+
+    q = Queue(position=position + 1, project_id=project.id, task_id=task.id)
     db.session.add(q)
 
     if reset_counter:

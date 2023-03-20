@@ -93,6 +93,7 @@ def initialize_extensions(app):
     from project.models.subset import Subset
     from project.models.model_class_results import ModelClassResult
     from project.models.annotation_extra import AnnotationError
+    from project.models.task import Task
 
 
 def register_blueprints(app):
@@ -161,6 +162,7 @@ def create_database(app):
     from project.models.model_image import ModelImage
     from project.models.initial_model import InitialModel
     from project.models.subset import Subset
+    from project.models.task import Task
 
     with app.app_context():
         db.drop_all()
@@ -194,6 +196,16 @@ def create_database(app):
         db.session.add_all([iss1, iss2, iss3])
         db.session.commit()
 
+        t1 = Task(name="train")
+        t2 = Task(name="check")
+        t3 = Task(name="test")
+        t4 = Task(name="checktrain")
+        t5 = Task(name="traintest")
+        t6 = Task(name="checktest")
+        t7 = Task(name="checktraintest")
+        db.session.add_all([t1,t2,t3,t4,t5,t6,t7])
+        db.session.commit()
+
         p = Project(name="unknown")
         db.session.add(p)
         db.session.flush()
@@ -205,7 +217,7 @@ def create_database(app):
         pro = Project(name="project")
         db.session.add(pro)
         db.session.flush()
-        pros = ProjectSettings(id=pro.id, max_class_nr=80)
+        pros = ProjectSettings(id=pro.id, max_class_nr=80, epochs=1)
         db.session.add(pros)
         db.session.commit()
 
