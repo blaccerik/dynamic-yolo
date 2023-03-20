@@ -200,7 +200,7 @@ def get_settings(project_code: int) -> dict:
         "img_size": project_settings.img_size,
         "initial_model": name,
 
-        "train_test_ratio": project_settings.train_test_ratio,
+        # "train_test_ratio": project_settings.train_test_ratio,
         "pretest_size_difference_threshold": project_settings.pretest_size_difference_threshold,
         "maximum_auto_train_number": project_settings.maximum_auto_train_number,
         "skip_pretesting": project_settings.skip_pretesting,
@@ -336,6 +336,11 @@ def retrieve_project_errors(project_code, page_nr, page_size):
         training_amount = ae.training_amount
         model_id = ae.model_id
         model_stats = model_results[model_id]
+        # todo get only models that are legal
+        #  model 8 is being trained, it doesnt have class results yet
+        #  yet it uses model 8's class results which doesnt exisr
+        #  pretest is done by previous model not new one
+        #  this should fix it
         model_class_confidence = 0
         if am is not None:
             model_class_confidence = model_stats.class_results[am.class_id]

@@ -1,3 +1,4 @@
+import datetime
 import io
 import logging
 import math
@@ -662,7 +663,7 @@ def start_training(project: Project) -> bool:
     if os.path.exists(f"{APP_ROOT_PATH}/yolo/data"):
         shutil.rmtree(f"{APP_ROOT_PATH}/yolo/data")
     initialize_yolo_folders()
-
+    print(datetime.datetime.now())
     print("ts 1")
     ts = TrainSession(project, project_settings, name, ss_test.id, ss_train.id, ss_val.id)
     print("ts 3")
@@ -683,5 +684,6 @@ def start_training(project: Project) -> bool:
         return True
     print("ts 8")
     ts.cleanup()
+    print(datetime.datetime.now())
     return False
 
