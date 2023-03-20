@@ -32,8 +32,17 @@ def change_annotation_values(annotation_code, data):
     annotation = Annotation.query.get(annotation_code)
     if annotation is None:
         raise ValidationError({"error": f"Annotation not found"})
+    if not data:
+        raise ValidationError('There were not any settings changed!')
+
     for k, v in data.items():
         setattr(annotation, k, v)
+
+    all_errors = annotation.model_annotation_errors + annotation.human_annotation_errors
+
+    for e in all_errors:
+        db.session.delete(e)
+
     db.session.add(annotation)
     db.session.commit()
 
