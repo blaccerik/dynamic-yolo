@@ -1,3 +1,5 @@
+import io
+import torch
 from marshmallow import ValidationError
 
 from project import db
@@ -5,6 +7,7 @@ from project.models.image import Image
 from project.models.model import Model
 from project.models.model_image import ModelImage
 from project.models.model_status import ModelStatus
+from project.models.project import Project
 
 
 def get_model(model_code: int):
@@ -40,3 +43,37 @@ def model_info(model_code: int):
         "model_results": result_ids,
         "images": image_ids
     }
+
+
+def upload_new_model(project_code, pt_file):
+    project = Project.query.get(project_code)
+    if not project:
+        raise ValidationError('Project not found!')
+
+    try:
+        file_in_bytes = io.BytesIO(pt_file.read())
+        torch_file = torch.load(file_in_bytes)
+    except:
+        raise ValidationError('Corrupt file!')
+
+    img_size_from_model = torch_file['opt']['imgsz']
+    classes_from_model = torch_file['model'].names
+    number_of_classes_from_model = len(torch_file['model'].names)
+
+    project = Project.query.get(project_code)
+    class_nr_from_project = project.project_settings.max_class_nr
+    img_size_from_project = project.project_settings.img_size
+
+    if img_size_from_model != img_size_from_project:
+        raise ValidationError('Image size does not match!')
+
+    if class_nr_from_project != number_of_classes_from_model:
+        raise ValidationError('Class amount does not match!')
+
+    for i in range(class_nr_from_project):
+        if i not in classes_from_model:
+            raise ValidationError('Classes are different!')
+
+    model_to_upload = Model(total_epochs=0, epochs=0, model_status_id=1, project_id=project_code, model=pt_file.read())
+    db.session.add(model_to_upload)
+    db.session.commit()
