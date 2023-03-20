@@ -637,6 +637,40 @@
         }
       }
     },
+    "/models/{project_id}": {
+      "post": {
+        "tags": [
+          "Models Requests"
+        ],
+        "summary": "Upload a new model to the project",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "description": "Project ID",
+            "schema": {
+              "$ref": "#/components/schemas/project_id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/upload_model"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        }
+      }
+    },
     "/projects/{project_id}/annotations": {
       "get": {
         "tags": [
@@ -1097,497 +1131,505 @@
           }
         }
       },
-      "project_settings": {
+      "upload_model": {
         "type": "object",
         "properties": {
-          "epochs": {
-            "type": "integer",
-            "description": "Number of training epochs"
-          },
-          "batch_size": {
-            "type": "integer",
-            "description": "Batch size for training"
-          },
-          "train_ratio": {
-            "type": "number",
-            "description": "Training  data split ratio"
-          },
-          "val_ratio": {
-            "type": "number",
-            "description": "Validation data split ratio"
-          },
-          "pretest_size_difference": {
-            "type": "number"
-          },
-          "maximum_auto_train_number": {
-            "type": "number"
-          },
-          "skip_pretesting": {
-            "type": "boolean",
-            "default": false
-          },
-          "freeze_backbone": {
-            "type": "boolean",
-            "default": false
-          },
-          "use_ram": {
-            "type": "boolean",
-            "default": false
-          },
-          "minimal_map_50_threshold": {
-            "type": "number",
-            "description": "Minimal map threshold"
-          },
-          "minimal_map_50_95_threshold": {
-            "type": "number"
-          },
-          "minimal_precision_threshold": {
-            "type": "number"
-          },
-          "minimal_recall_threshold": {
-            "type": "number"
-          },
-          "min_confidence_threshold": {
-            "type": "number",
-            "description": "Minimum confidence threshold for detection"
-          },
-          "min_iou_threshold": {
-            "type": "number",
-            "description": "Minimum intersection over union threshold for detection"
-          }
-        }
-      },
-      "get_project_settings": {
-        "type": "object",
-        "properties": {
-          "max_class_nr": {
-            "type": "integer"
-          },
-          "epochs": {
-            "type": "integer"
-          },
-          "batch_size": {
-            "type": "integer"
-          },
-          "img_size": {
-            "type": "integer"
-          },
-          "initial_model": {
+          "model_file": {
             "type": "string",
-            "format": "string"
-          },
-          "train_ratio": {
-            "type": "integer"
-          },
-          "val_ratio": {
-            "type": "integer"
-          },
-          "pretest_size_difference_threshold": {
-            "type": "number"
-          },
-          "maximum_auto_train_number": {
-            "type": "integer"
-          },
-          "skip_pretesting": {
-            "type": "boolean"
-          },
-          "freeze_backbone": {
-            "type": "boolean"
-          },
-          "use_ram": {
-            "type": "boolean"
-          },
-          "minimal_map_50_threshold": {
-            "type": "integer"
-          },
-          "minimal_map_50_95_threshold": {
-            "type": "integer"
-          },
-          "minimal_precision_threshold": {
-            "type": "integer"
-          },
-          "minimal_recall_threshold": {
-            "type": "integer"
-          },
-          "min_confidence_threshold": {
-            "type": "integer"
-          },
-          "min_iou_threshold": {
-            "type": "integer"
+            "format": "binary"
           }
-        }
-      },
-      "simple_model_info": {
-        "type": "object",
-        "properties": {
-          "model_status_name": {
-            "type": "string",
-            "description": "Status of the model"
-          },
-          "id": {
-            "type": "integer",
-            "format": "int64",
-            "description": "ID of the model"
-          },
-          "added": {
-            "type": "string",
-            "format": "date-time",
-            "description": "Date and time the model was added"
-          },
-          "project_id": {
-            "type": "integer",
-            "format": "int64",
-            "description": "ID of the project model is associated with"
-          }
-        }
-      },
-      "model_id": {
-        "type": "integer"
-      },
-      "simple_annotation_info": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "integer",
-            "description": "ID of the annotation"
-          },
-          "project_id": {
-            "type": "integer",
-            "description": "ID of the project"
-          },
-          "annotator_name": {
-            "type": "string",
-            "description": "Annotator of the annotation"
-          },
-          "image_id": {
-            "type": "integer",
-            "description": "ID of the image"
-          }
-        }
-      },
-      "image": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "annotations": {
-            "type": "array",
-            "items": {
+        }},
+        "project_settings": {
+          "type": "object",
+          "properties": {
+            "epochs": {
               "type": "integer",
-              "description": "ID-s of annotations"
-            }
-          },
-          "models": {
-            "type": "array",
-            "items": {
+              "description": "Number of training epochs"
+            },
+            "batch_size": {
               "type": "integer",
-              "description": "ID-s of models"
-            }
-          },
-          "subset_name": {
-            "type": "string",
-            "format": "string"
-          }
-        }
-      },
-      "model_info": {
-        "type": "object",
-        "properties": {
-          "parent_model_id": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "added": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "total_epochs": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "epochs": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "model_status_name": {
-            "type": "string"
-          },
-          "project_id": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "model_results": {
-            "type": "array",
-            "items": {
-              "type": "integer",
-              "description": "ID-s of results"
-            }
-          },
-          "images": {
-            "type": "array",
-            "items": {
-              "type": "integer",
-              "description": "ID-s of images"
+              "description": "Batch size for training"
+            },
+            "train_ratio": {
+              "type": "number",
+              "description": "Training  data split ratio"
+            },
+            "val_ratio": {
+              "type": "number",
+              "description": "Validation data split ratio"
+            },
+            "pretest_size_difference": {
+              "type": "number"
+            },
+            "maximum_auto_train_number": {
+              "type": "number"
+            },
+            "skip_pretesting": {
+              "type": "boolean",
+              "default": false
+            },
+            "freeze_backbone": {
+              "type": "boolean",
+              "default": false
+            },
+            "use_ram": {
+              "type": "boolean",
+              "default": false
+            },
+            "minimal_map_50_threshold": {
+              "type": "number",
+              "description": "Minimal map threshold"
+            },
+            "minimal_map_50_95_threshold": {
+              "type": "number"
+            },
+            "minimal_precision_threshold": {
+              "type": "number"
+            },
+            "minimal_recall_threshold": {
+              "type": "number"
+            },
+            "min_confidence_threshold": {
+              "type": "number",
+              "description": "Minimum confidence threshold for detection"
+            },
+            "min_iou_threshold": {
+              "type": "number",
+              "description": "Minimum intersection over union threshold for detection"
             }
           }
         },
-        "required": [
-          "id",
-          "added",
-          "total_epochs",
-          "epochs",
-          "model_status_id",
-          "project_id"
-        ]
-      },
-      "ModelImage": {
-        "type": "object",
-        "properties": {
-          "model_id": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "image_id": {
-            "type": "integer",
-            "format": "int64"
+        "get_project_settings": {
+          "type": "object",
+          "properties": {
+            "max_class_nr": {
+              "type": "integer"
+            },
+            "epochs": {
+              "type": "integer"
+            },
+            "batch_size": {
+              "type": "integer"
+            },
+            "img_size": {
+              "type": "integer"
+            },
+            "initial_model": {
+              "type": "string",
+              "format": "string"
+            },
+            "train_ratio": {
+              "type": "integer"
+            },
+            "val_ratio": {
+              "type": "integer"
+            },
+            "pretest_size_difference_threshold": {
+              "type": "number"
+            },
+            "maximum_auto_train_number": {
+              "type": "integer"
+            },
+            "skip_pretesting": {
+              "type": "boolean"
+            },
+            "freeze_backbone": {
+              "type": "boolean"
+            },
+            "use_ram": {
+              "type": "boolean"
+            },
+            "minimal_map_50_threshold": {
+              "type": "integer"
+            },
+            "minimal_map_50_95_threshold": {
+              "type": "integer"
+            },
+            "minimal_precision_threshold": {
+              "type": "integer"
+            },
+            "minimal_recall_threshold": {
+              "type": "integer"
+            },
+            "min_confidence_threshold": {
+              "type": "integer"
+            },
+            "min_iou_threshold": {
+              "type": "integer"
+            }
           }
         },
-        "required": [
-          "model_id",
-          "image_id"
-        ]
-      },
-      "Queue": {
-        "type": "object",
-        "properties": {
-          "position": {
-            "type": "integer"
-          },
-          "project_id": {
-            "type": "integer"
+        "simple_model_info": {
+          "type": "object",
+          "properties": {
+            "model_status_name": {
+              "type": "string",
+              "description": "Status of the model"
+            },
+            "id": {
+              "type": "integer",
+              "format": "int64",
+              "description": "ID of the model"
+            },
+            "added": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Date and time the model was added"
+            },
+            "project_id": {
+              "type": "integer",
+              "format": "int64",
+              "description": "ID of the project model is associated with"
+            }
           }
         },
-        "required": [
-          "position",
-          "project_id"
-        ]
-      },
-      "annotation_info": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "integer"
-          },
-          "x_center": {
-            "type": "number",
-            "format": "float"
-          },
-          "y_center": {
-            "type": "number",
-            "format": "float"
-          },
-          "width": {
-            "type": "number",
-            "format": "float"
-          },
-          "height": {
-            "type": "number",
-            "format": "float"
-          },
-          "class_id": {
-            "type": "integer"
-          },
-          "project_id": {
-            "type": "integer"
-          },
-          "image_id": {
-            "type": "integer"
-          },
-          "annotator_name": {
-            "type": "string"
+        "model_id": {
+          "type": "integer"
+        },
+        "simple_annotation_info": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "integer",
+              "description": "ID of the annotation"
+            },
+            "project_id": {
+              "type": "integer",
+              "description": "ID of the project"
+            },
+            "annotator_name": {
+              "type": "string",
+              "description": "Annotator of the annotation"
+            },
+            "image_id": {
+              "type": "integer",
+              "description": "ID of the image"
+            }
           }
         },
-        "required": [
-          "id",
-          "x_center",
-          "y_center",
-          "width",
-          "height",
-          "class_id",
-          "project_id",
-          "annotator_id"
-        ]
-      },
-      "change_annotation": {
-        "type": "object",
-        "properties": {
-          "x_center": {
-            "type": "number",
-            "format": "float"
-          },
-          "y_center": {
-            "type": "number",
-            "format": "float"
-          },
-          "width": {
-            "type": "number",
-            "format": "float"
-          },
-          "height": {
-            "type": "number",
-            "format": "float"
-          },
-          "class_id": {
-            "type": "integer"
+        "image": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "annotations": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "description": "ID-s of annotations"
+              }
+            },
+            "models": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "description": "ID-s of models"
+              }
+            },
+            "subset_name": {
+              "type": "string",
+              "format": "string"
+            }
           }
         },
-        "required": [
-          "id",
-          "x_center",
-          "y_center",
-          "width",
-          "height",
-          "class_id",
-          "project_id",
-          "annotator_id"
-        ]
-      },
-      "annotation_id": {
-        "type": "integer"
-      },
-      "simple_model_results": {
-        "type": "object",
-        "properties": {
-          "result_id": {
-            "type": "integer"
+        "model_info": {
+          "type": "object",
+          "properties": {
+            "parent_model_id": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "added": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "total_epochs": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "epochs": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "model_status_name": {
+              "type": "string"
+            },
+            "project_id": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "model_results": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "description": "ID-s of results"
+              }
+            },
+            "images": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "description": "ID-s of images"
+              }
+            }
           },
-          "subset_name": {
-            "type": "string"
+          "required": [
+            "id",
+            "added",
+            "total_epochs",
+            "epochs",
+            "model_status_id",
+            "project_id"
+          ]
+        },
+        "ModelImage": {
+          "type": "object",
+          "properties": {
+            "model_id": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "image_id": {
+              "type": "integer",
+              "format": "int64"
+            }
           },
-          "model_id": {
-            "type": "integer"
+          "required": [
+            "model_id",
+            "image_id"
+          ]
+        },
+        "Queue": {
+          "type": "object",
+          "properties": {
+            "position": {
+              "type": "integer"
+            },
+            "project_id": {
+              "type": "integer"
+            }
           },
-          "metric_precision": {
-            "type": "number",
-            "format": "float"
+          "required": [
+            "position",
+            "project_id"
+          ]
+        },
+        "annotation_info": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "integer"
+            },
+            "x_center": {
+              "type": "number",
+              "format": "float"
+            },
+            "y_center": {
+              "type": "number",
+              "format": "float"
+            },
+            "width": {
+              "type": "number",
+              "format": "float"
+            },
+            "height": {
+              "type": "number",
+              "format": "float"
+            },
+            "class_id": {
+              "type": "integer"
+            },
+            "project_id": {
+              "type": "integer"
+            },
+            "image_id": {
+              "type": "integer"
+            },
+            "annotator_name": {
+              "type": "string"
+            }
           },
-          "metric_recall": {
-            "type": "number",
-            "format": "float"
+          "required": [
+            "id",
+            "x_center",
+            "y_center",
+            "width",
+            "height",
+            "class_id",
+            "project_id",
+            "annotator_id"
+          ]
+        },
+        "change_annotation": {
+          "type": "object",
+          "properties": {
+            "x_center": {
+              "type": "number",
+              "format": "float"
+            },
+            "y_center": {
+              "type": "number",
+              "format": "float"
+            },
+            "width": {
+              "type": "number",
+              "format": "float"
+            },
+            "height": {
+              "type": "number",
+              "format": "float"
+            },
+            "class_id": {
+              "type": "integer"
+            }
           },
-          "metric_map_50": {
-            "type": "number",
-            "format": "float"
-          },
-          "metric_map_50_95": {
-            "type": "number",
-            "format": "float"
+          "required": [
+            "id",
+            "x_center",
+            "y_center",
+            "width",
+            "height",
+            "class_id",
+            "project_id",
+            "annotator_id"
+          ]
+        },
+        "annotation_id": {
+          "type": "integer"
+        },
+        "simple_model_results": {
+          "type": "object",
+          "properties": {
+            "result_id": {
+              "type": "integer"
+            },
+            "subset_name": {
+              "type": "string"
+            },
+            "model_id": {
+              "type": "integer"
+            },
+            "metric_precision": {
+              "type": "number",
+              "format": "float"
+            },
+            "metric_recall": {
+              "type": "number",
+              "format": "float"
+            },
+            "metric_map_50": {
+              "type": "number",
+              "format": "float"
+            },
+            "metric_map_50_95": {
+              "type": "number",
+              "format": "float"
+            }
           }
+        },
+        "detailed_model_results": {
+          "type": "object",
+          "properties": {
+            "result_id": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "model_id": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "project_id": {
+              "type": "integer"
+            },
+            "subset_name": {
+              "type": "string"
+            },
+            "epoch": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true
+            },
+            "metric_precision": {
+              "type": "number",
+              "format": "float"
+            },
+            "metric_recall": {
+              "type": "number",
+              "format": "float"
+            },
+            "metric_map_50": {
+              "type": "number",
+              "format": "float"
+            },
+            "metric_map_50_95": {
+              "type": "number",
+              "format": "float"
+            },
+            "val_box_loss": {
+              "type": "number",
+              "format": "float"
+            },
+            "val_obj_loss": {
+              "type": "number",
+              "format": "float"
+            },
+            "val_cls_loss": {
+              "type": "number",
+              "format": "float"
+            }
+          },
+          "required": [
+            "model_id",
+            "subset_id",
+            "metric_precision",
+            "metric_recall",
+            "metric_map_50",
+            "metric_map_50_95",
+            "val_box_loss",
+            "val_obj_loss",
+            "val_cls_loss"
+          ]
+        },
+        "post_annotation": {
+          "type": "object",
+          "properties": {
+            "x_center": {
+              "type": "number",
+              "format": "float"
+            },
+            "y_center": {
+              "type": "number",
+              "format": "float"
+            },
+            "width": {
+              "type": "number",
+              "format": "float"
+            },
+            "height": {
+              "type": "number",
+              "format": "float"
+            },
+            "class_id": {
+              "type": "integer"
+            },
+            "image_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "id",
+            "x_center",
+            "y_center",
+            "width",
+            "height",
+            "class_id",
+            "image_id"
+          ]
         }
-      },
-      "detailed_model_results": {
-        "type": "object",
-        "properties": {
-          "result_id": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "model_id": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "project_id": {
-            "type": "integer"
-          },
-          "subset_name": {
-            "type": "string"
-          },
-          "epoch": {
-            "type": "integer",
-            "format": "int32",
-            "nullable": true
-          },
-          "metric_precision": {
-            "type": "number",
-            "format": "float"
-          },
-          "metric_recall": {
-            "type": "number",
-            "format": "float"
-          },
-          "metric_map_50": {
-            "type": "number",
-            "format": "float"
-          },
-          "metric_map_50_95": {
-            "type": "number",
-            "format": "float"
-          },
-          "val_box_loss": {
-            "type": "number",
-            "format": "float"
-          },
-          "val_obj_loss": {
-            "type": "number",
-            "format": "float"
-          },
-          "val_cls_loss": {
-            "type": "number",
-            "format": "float"
-          }
-        },
-        "required": [
-          "model_id",
-          "subset_id",
-          "metric_precision",
-          "metric_recall",
-          "metric_map_50",
-          "metric_map_50_95",
-          "val_box_loss",
-          "val_obj_loss",
-          "val_cls_loss"
-        ]
-      },
-      "post_annotation": {
-        "type": "object",
-        "properties": {
-          "x_center": {
-            "type": "number",
-            "format": "float"
-          },
-          "y_center": {
-            "type": "number",
-            "format": "float"
-          },
-          "width": {
-            "type": "number",
-            "format": "float"
-          },
-          "height": {
-            "type": "number",
-            "format": "float"
-          },
-          "class_id": {
-            "type": "integer"
-          },
-          "image_id": {
-            "type": "integer"
-          }
-        },
-        "required": [
-          "id",
-          "x_center",
-          "y_center",
-          "width",
-          "height",
-          "class_id",
-          "image_id"
-        ]
       }
     }
   }
-}
 
 
