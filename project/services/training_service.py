@@ -10,6 +10,7 @@ import numpy as np
 import torch
 import yaml
 from sqlalchemy import and_, func, or_
+from sqlalchemy.orm import aliased
 
 from project import db, APP_ROOT_PATH, DB_READ_BATCH_SIZE, NUMBER_OF_YOLO_WORKERS
 from project.models.annotation import Annotation
@@ -51,6 +52,7 @@ class SqlStream:
 
         self.best_model_weights = None
         self.good_images = set()
+        self.cache = {}
 
         # yolo dataloader
         self.img_size = [project_settings.img_size, project_settings.img_size]
@@ -170,10 +172,10 @@ class SqlStream:
         h_diff = abs(ano2.height - ano.height)
         x_diff = abs(ano2.x_center - ano.x_center)
         y_diff = abs(ano2.y_center - ano.y_center)
-        return w_diff < self.project_settings.pretest_size_difference_threshold and \
-            h_diff < self.project_settings.pretest_size_difference_threshold and \
-            x_diff < self.project_settings.pretest_size_difference_threshold and \
-            y_diff < self.project_settings.pretest_size_difference_threshold
+        return w_diff < self.project_settings.check_size_difference_threshold and \
+            h_diff < self.project_settings.check_size_difference_threshold and \
+            x_diff < self.project_settings.check_center_difference_threshold and \
+            y_diff < self.project_settings.check_center_difference_threshold
 
     def normalize_preds(self, pred, im0, im, image_id):
 
@@ -184,8 +186,25 @@ class SqlStream:
             Annotation.annotator_id != None
         )).all()
 
+        ae = aliased(AnnotationError)
+        annotations2 = db.session.query(
+            Annotation.id,
+            func.count(ae.human_annotation_id).label('count')
+        ).join(
+            ae,
+            ae.human_annotation_id == Annotation.id
+        ).filter(and_(
+            Annotation.image_id == image_id,
+            Annotation.annotator_id != None
+        )).group_by(
+            Annotation.id
+        ).all()
+        if image_id == 3:
+            for i in annotations2:
+                print(i)
+
         # how many times image has been used
-        times_used = db.session.query(
+        image_used = db.session.query(
             func.sum(Model.epochs)
         ).join(
             ModelImage, ModelImage.model_id == Model.id
@@ -194,8 +213,8 @@ class SqlStream:
         ).group_by(
             ModelImage.image_id
         ).scalar()
-        if times_used is None:
-            times_used = 0
+        if image_used is None:
+            image_used = 0
 
         predictions = []
         for i, det in enumerate(pred):  # per image
@@ -237,6 +256,15 @@ class SqlStream:
                 db.session.delete(pred.annotation)
                 continue
             is_all_correct = False
+
+            # # find how many times this human ano has been in errors
+            # if ano.id in self.cache:
+            #     human_annotation_count = self.cache[ano.id]
+            # else:
+            #     count = db.session.query(func.count(AnnotationError.human_annotation_id)).filter(
+            #         AnnotationError.human_annotation_id == ano.id).scalar()
+            #     print(count)
+
             ae = AnnotationError()
             if ano is not None:
                 ae.human_annotation_id = ano.id
@@ -244,7 +272,7 @@ class SqlStream:
                 ae.model_annotation_id = pred.annotation.id
                 ae.confidence = pred.conf
             ae.model_id = self.db_model.id
-            ae.training_amount = times_used
+            ae.image_count = image_used
             ae.image_id = image_id
             db.session.add(ae)
 
@@ -299,12 +327,20 @@ class TrainSession:
 
     def check(self):
         print("check")
-        if self.skip_check or self.db_prev_model is None or self.db_prev_model.model is None:
+        if self.skip_check:
             return
-        self.db_prev_model.model_status_id = self.ms_test.id
-        db.session.add(self.db_prev_model)
+
+        # use prev model if possible
+        if self.db_prev_model is not None and self.db_prev_model.model is not None:
+            model = self.db_prev_model
+        elif self.db_new_model is not None and self.db_new_model.model is not None:
+            model = self.db_new_model
+        else:
+            return
+        model.model_status_id = self.ms_test.id
+        db.session.add(model)
         db.session.commit()
-        self.stream.db_model = self.db_prev_model
+        self.stream.db_model = model
 
         # set logging to warning to see much less info at console
         logging.getLogger("yolov5").setLevel(logging.ERROR)
@@ -322,7 +358,7 @@ class TrainSession:
         setattr(opt, "name", "yolo_test")
 
         # load model
-        setattr(opt, "binary_weights", self.db_prev_model.model)
+        setattr(opt, "binary_weights", model.model)
 
         # load sql stream
         setattr(opt, "sql_stream", self.stream)
@@ -330,8 +366,8 @@ class TrainSession:
         # run model
         detect.main(opt)
 
-        self.db_prev_model.model_status_id = self.ms_ready.id
-        db.session.add(self.db_prev_model)
+        model.model_status_id = self.ms_ready.id
+        db.session.add(model)
         db.session.commit()
 
     def __init_new_db_model__(self, project, project_settings):

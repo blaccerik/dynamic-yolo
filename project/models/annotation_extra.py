@@ -10,6 +10,9 @@ class AnnotationError(db.Model):
     human_annotation_id = Column(BigInteger, ForeignKey(Annotation.id), nullable=True)
 
     confidence = Column(Float, nullable=True)
-    training_amount = Column(Integer, nullable=False)
+
+    image_count = Column(Integer, nullable=False)
+    human_annotation_count = Column(Integer, nullable=True)
+
     model_id = Column(BigInteger, ForeignKey("model.id"), nullable=False)
     image_id = Column(BigInteger, ForeignKey("image.id"), nullable=False)

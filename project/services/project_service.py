@@ -26,7 +26,11 @@ class ModelStats:
         self.class_results = {mcr.class_id: mcr.confidence}
 
     def add(self, mcr: ModelClassResult):
-        self.class_results[mcr.class_id] = mcr.confidence
+        if mcr.class_id in self.class_results:
+            if self.class_results[mcr.class_id] < mcr.confidence:
+                self.class_results[mcr.class_id] = mcr.confidence
+        else:
+            self.class_results[mcr.class_id] = mcr.confidence
 
 
 def create_project(name: str, class_nr: int, init_model: str, img_size: int) -> int:
@@ -332,19 +336,19 @@ def retrieve_project_errors(project_code, page_nr, page_size):
             model_results[model_id] = ModelStats(mr, mcr)
 
     weighted_results = []
+    cache = {}
     # go through every mistake and give it a score
     for ae, am, ah in query:
+        model_id = ae.model_id
+        # model doesnt have class results
+        if model_id not in model_results:
+            continue
+
+        model_stats = model_results[model_id]
         confidence = ae.confidence
         if confidence is None:
             confidence = 0
         training_amount = ae.training_amount
-        model_id = ae.model_id
-        model_stats = model_results[model_id]
-        # todo get only models that are legal
-        #  model 8 is being trained, it doesnt have class results yet
-        #  yet it uses model 8's class results which doesnt exisr
-        #  pretest is done by previous model not new one
-        #  this should fix it
         model_class_confidence = 0
         if am is not None:
             model_class_confidence = model_stats.class_results[am.class_id]
