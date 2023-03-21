@@ -1,28 +1,22 @@
 import atexit
 import os
 import pathlib
+import subprocess
+import time
 
-import werkzeug
 from apscheduler.schedulers.background import BackgroundScheduler
 from dotenv import load_dotenv
 from flask import Flask, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from flask_swagger_ui import get_swaggerui_blueprint
 from werkzeug.serving import is_running_from_reloader
-import torch
 
-if torch.cuda.is_available():
-    print(torch.cuda.get_device_name(0))
-else:
-    print("no gpu/cuda found")
 
-import resource
 
 # max_data_memory = int(os.getenv('RLIMIT_DATA', -1))
 # resource.setrlimit(resource.RLIMIT_DATA, (max_data_memory, max_data_memory))
 # in .env file
 # RLIMIT_DATA=2636870912 # 2.6gb
-
 
 db = SQLAlchemy()
 
@@ -44,7 +38,6 @@ SWAGGERUI_BLUEPRINT = get_swaggerui_blueprint(
     }
 )
 
-### end swagger specific ###
 
 def create_app(config_filename=None):
     # Create the Flask application
@@ -71,6 +64,7 @@ def create_app(config_filename=None):
         scheduler.add_job(func=update_queue, args=[app], trigger="interval", seconds=5)
         scheduler.start()
         atexit.register(lambda: scheduler.shutdown())
+
 
     return app
 
@@ -172,7 +166,8 @@ def create_database(app):
         ps1 = ProjectStatus(name="busy")
         ps2 = ProjectStatus(name="idle")
         ps3 = ProjectStatus(name="error")
-        db.session.add_all([ps1, ps2, ps3])
+        ps4 = ProjectStatus(name="done")
+        db.session.add_all([ps1, ps2, ps3, ps4])
         db.session.commit()
 
         ms1 = ModelStatus(name="ready")

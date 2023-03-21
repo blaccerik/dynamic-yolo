@@ -1,16 +1,11 @@
 import json
 import os
 
-import requests
-import torch
+import docker
 from flask import Blueprint
 
 from project import db
 from project.models.model import Model
-from project.models.project import Project
-from project.services.queue_service import add_to_queue, start_training
-from project.services.training_service import TrainSession
-import docker
 
 mod = Blueprint('home', __name__)
 

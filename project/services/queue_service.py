@@ -1,18 +1,24 @@
+import os
+import subprocess
+
 from sqlalchemy import func, asc
 
 from project import db
-from project.models.project_settings import ProjectSettings
-from project.models.project_status import ProjectStatus
 from project.models.project import Project
+from project.models.project_status import ProjectStatus
 from project.models.queue import Queue
 from project.models.task import Task
-from project.services.training_service import start_training
 
 
 def update_queue(app):
     """
     Call this function to check for updates in the queue
     :return:
+    """
+    """
+    RuntimeError: The server socket has failed to listen on any local network address. 
+    The server socket has failed to bind to [::]:29500 (errno: 98 - Address already in use). 
+    The server socket has failed to bind to 0.0.0.0:29500 (errno: 98 - Address already in use).
     """
     with app.app_context():
         queue = Queue.query.order_by(asc(Queue.position)).all()
@@ -22,6 +28,8 @@ def update_queue(app):
 
         # check if anything is training
         ps = ProjectStatus.query.filter(ProjectStatus.name.like("busy")).first()
+        ps_done = ProjectStatus.query.filter(ProjectStatus.name.like("done")).first()
+        ps_idle = ProjectStatus.query.filter(ProjectStatus.name.like("idle")).first()
         entry = Project.query.filter(Project.project_status_id == ps.id).first()
         if entry is not None:
             return
@@ -31,6 +39,12 @@ def update_queue(app):
 
         # update project status
         project = Project.query.get(project_id)
+
+        if project.project_status_id == ps_done:
+            project.project_status_id = ps_idle
+            db.session.add(project)
+            db.session.commit()
+            return
 
         # project cant be in error state
         ps_error = ProjectStatus.query.filter(ProjectStatus.name.like("error")).first()
@@ -57,15 +71,23 @@ def update_queue(app):
             return
 
         # train
-        error = start_training(project, first.task_id)
-        if error:
-            new_ps = ProjectStatus.query.filter(ProjectStatus.name.like("error")).first()
-        else:
-            new_ps = ProjectStatus.query.filter(ProjectStatus.name.like("idle")).first()
-        # set project state
-        project.project_status_id = new_ps.id
-        db.session.add(project)
-        db.session.commit()
+        subprocess.Popen([
+            "python",
+            "-m", "torch.distributed.run",
+            "--nproc_per_node", "1",
+            "training_session/main.py",
+            "--project_id", str(project.id),
+            "--task_id", str(first.task_id)
+        ])
+        # error = start_training(project, first.task_id)
+        # if error:
+        #     new_ps = ProjectStatus.query.filter(ProjectStatus.name.like("error")).first()
+        # else:
+        #     new_ps = ProjectStatus.query.filter(ProjectStatus.name.like("idle")).first()
+        # # set project state
+        # project.project_status_id = new_ps.id
+        # db.session.add(project)
+        # db.session.commit()
 
 
 def add_to_queue(project_id: int, task_name: str, reset_counter=True):
