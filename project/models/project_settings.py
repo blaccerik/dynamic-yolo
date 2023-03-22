@@ -25,7 +25,9 @@ class ProjectSettings(db.Model):
     val_ratio = Column(Integer, nullable=False, default=25)
 
     # error detection
-    pretest_size_difference_threshold = Column(Float, nullable=False, default=0.05)
+    check_size_difference_threshold = Column(Float, nullable=False, default=0.05)
+    check_center_difference_threshold = Column(Float, nullable=False, default=0.1)
+
     maximum_auto_train_number = Column(Integer, nullable=False, default=3)
 
     # min confidence for model to read image section as detection

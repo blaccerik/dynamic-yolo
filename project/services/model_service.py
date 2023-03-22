@@ -8,6 +8,8 @@ from project.models.model import Model
 from project.models.model_image import ModelImage
 from project.models.model_status import ModelStatus
 from project.models.project import Project
+from project.models.project_status import ProjectStatus
+from yolov5.models.experimental import attempt_load
 
 
 def get_model(model_code: int):
@@ -19,9 +21,9 @@ def get_model(model_code: int):
     m = Model.query.get(model_code)
     if m is None:
         raise ValidationError({"error": f"Model not found"})
-    ms = ModelStatus.query.filter(ModelStatus.name.like("ready")).first()
-    if m.model_status_id != ms.id:
-        raise ValidationError({"error": f"Model is not in 'ready' status"})
+    ms = ModelStatus.query.filter(ModelStatus.name.like("training")).first()
+    if m.model_status_id == ms.id:
+        raise ValidationError({"error": f"Model is in 'training' status"})
     return m
 
 
@@ -49,11 +51,18 @@ def upload_new_model(project_code, pt_file):
     project = Project.query.get(project_code)
     if not project:
         raise ValidationError('Project not found!')
+    new_ps = ProjectStatus.query.filter(ProjectStatus.name.like("idle")).first()
+    if project.project_status_id != new_ps.id:
+        raise ValidationError("Project must be 'idle'!")
 
     try:
-        file_in_bytes = io.BytesIO(pt_file.read())
-        torch_file = torch.load(file_in_bytes)
-    except:
+        binary_bytes = pt_file.read()
+        # attempt load needs to be here for torch to find yolov5 models
+        attempt_load("test", binary_weights=binary_bytes)
+        file_in_bytes = io.BytesIO(binary_bytes)
+        torch_file = torch.load(file_in_bytes, map_location='cpu')
+    except Exception as e:
+        print(e)
         raise ValidationError('Corrupt file!')
 
     img_size_from_model = torch_file['opt']['imgsz']
@@ -73,7 +82,9 @@ def upload_new_model(project_code, pt_file):
     for i in range(class_nr_from_project):
         if i not in classes_from_model:
             raise ValidationError('Classes are different!')
-
-    model_to_upload = Model(total_epochs=0, epochs=0, model_status_id=1, project_id=project_code, model=pt_file.read())
+    model_to_upload = Model(total_epochs=0, epochs=0, model_status_id=1, project_id=project_code, model=binary_bytes)
     db.session.add(model_to_upload)
+    db.session.flush()
+    project.latest_model_id = model_to_upload.id
+    db.session.add(project)
     db.session.commit()

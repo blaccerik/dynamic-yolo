@@ -34,7 +34,8 @@ from pathlib import Path
 
 import torch
 
-from project.services.training_service import SqlStream
+from main import SqlStream
+from main import Session
 
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[0]  # YOLOv5 root directory
@@ -92,9 +93,9 @@ def run(
         source = check_file(source)  # download
 
     # Directories
-    save_dir = increment_path(Path(project) / name, exist_ok=exist_ok)  # increment run
-    (save_dir / 'labels' if save_txt else save_dir).mkdir(parents=True, exist_ok=True)  # make dir
-
+    if sql_stream is None:
+        save_dir = increment_path(Path(project) / name, exist_ok=exist_ok)  # increment run
+        (save_dir / 'labels' if save_txt else save_dir).mkdir(parents=True, exist_ok=True)  # make dir
     # Load model
     device = select_device(device)
     model = DetectMultiBackend(weights, device=device, dnn=dnn, data=data, fp16=half, binary_weights=binary_weights)
@@ -120,25 +121,25 @@ def run(
     seen, windows, dt = 0, [], (Profile(), Profile(), Profile())
 
     if sql_stream is not None:
-        for im, im0, image_id in sql_stream.get_all_train_images():
+        with Session() as session:
+            for im, im0, image_id in sql_stream.get_all_train_images(session):
+                with dt[0]:
+                    im = torch.from_numpy(im).to(model.device)
+                    im = im.half() if model.fp16 else im.float()  # uint8 to fp16/32
+                    im /= 255  # 0 - 255 to 0.0 - 1.0
+                    if len(im.shape) == 3:
+                        im = im[None]  # expand for batch dim
 
-            with dt[0]:
-                im = torch.from_numpy(im).to(model.device)
-                im = im.half() if model.fp16 else im.float()  # uint8 to fp16/32
-                im /= 255  # 0 - 255 to 0.0 - 1.0
-                if len(im.shape) == 3:
-                    im = im[None]  # expand for batch dim
+                # Inference
+                with dt[1]:
+                    pred = model(im, augment=augment, visualize=False)
 
-            # Inference
-            with dt[1]:
-                pred = model(im, augment=augment, visualize=False)
+                # NMS
+                with dt[2]:
+                    pred = non_max_suppression(pred, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)
 
-            # NMS
-            with dt[2]:
-                pred = non_max_suppression(pred, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)
-
-            # preds
-            sql_stream.normalize_preds(pred, im0, im, image_id)
+                # preds
+                sql_stream.normalize_preds(pred, im0, im, image_id, session)
     else:
         for path, im, im0s, vid_cap, s in dataset:
             with dt[0]:

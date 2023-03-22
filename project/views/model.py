@@ -1,8 +1,10 @@
 from flask import Blueprint, request, jsonify, send_file
-from project.services.model_service import get_model, model_info, upload_new_model
 
+from project.services.model_service import get_model, model_info, upload_new_model
 import io
 import torch
+
+from yolov5.models.experimental import attempt_load
 
 REQUEST_API = Blueprint('models', __name__, url_prefix="/models")
 
@@ -17,6 +19,9 @@ def get_model_info(model_id):
 def download_model(model_id):
     model = get_model(model_id)
     binary_data = model.model
+
+    # this needs to be here or else torch cant load model
+    attempt_load("e", binary_weights=binary_data)
     pt_data = torch.load(io.BytesIO(binary_data))
     pt_file = io.BytesIO()
     torch.save(pt_data, pt_file)

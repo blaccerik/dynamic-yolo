@@ -1,28 +1,23 @@
 import atexit
 import os
 import pathlib
+import subprocess
+import sys
+import time
 
-import werkzeug
 from apscheduler.schedulers.background import BackgroundScheduler
 from dotenv import load_dotenv
 from flask import Flask, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from flask_swagger_ui import get_swaggerui_blueprint
 from werkzeug.serving import is_running_from_reloader
-import torch
 
-if torch.cuda.is_available():
-    print(torch.cuda.get_device_name(0))
-else:
-    print("no gpu/cuda found")
 
-import resource
 
 # max_data_memory = int(os.getenv('RLIMIT_DATA', -1))
 # resource.setrlimit(resource.RLIMIT_DATA, (max_data_memory, max_data_memory))
 # in .env file
 # RLIMIT_DATA=2636870912 # 2.6gb
-
 
 db = SQLAlchemy()
 
@@ -32,6 +27,13 @@ APP_ROOT_PATH = pathlib.Path(__file__).parent.resolve()
 load_dotenv()
 DB_READ_BATCH_SIZE = int(os.getenv("DB_READ_BATCH_SIZE"))
 NUMBER_OF_YOLO_WORKERS = int(os.getenv("NUMBER_OF_YOLO_WORKERS"))
+
+# sys.path.insert(0, f"{APP_ROOT_PATH}/training_session/yolov5/")
+# sys.path.insert(0, f"{APP_ROOT_PATH}/training_session/yolov5/models")
+# sys.path.insert(0, './yolov5')
+sys.path.append(f"{APP_ROOT_PATH}/training_session/yolov5/models")
+sys.path.append(f"{APP_ROOT_PATH}/training_session/yolov5/")
+print(sys.path)
 
 ### swagger specific ###
 SWAGGER_URL = '/swagger'
@@ -44,7 +46,6 @@ SWAGGERUI_BLUEPRINT = get_swaggerui_blueprint(
     }
 )
 
-### end swagger specific ###
 
 def create_app(config_filename=None):
     # Create the Flask application
@@ -72,6 +73,7 @@ def create_app(config_filename=None):
         scheduler.start()
         atexit.register(lambda: scheduler.shutdown())
 
+
     return app
 
 
@@ -94,7 +96,6 @@ def initialize_extensions(app):
     from project.models.model_class_results import ModelClassResult
     from project.models.annotation_extra import AnnotationError
     from project.models.task import Task
-
 
 def register_blueprints(app):
     from project.views import home

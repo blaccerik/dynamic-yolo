@@ -73,9 +73,10 @@ def train(hyp, opt, device, callbacks, binary_weights=None, yaml_dict=None, sql_
         opt.resume, opt.noval, opt.nosave, opt.workers, opt.freeze
     callbacks.run('on_pretrain_routine_start')
     # Directories
-    w = save_dir / 'weights'  # weights dir
-    (w.parent if evolve else w).mkdir(parents=True, exist_ok=True)  # make dir
-    last, best = w / 'last.pt', w / 'best.pt'
+    if sql_stream is None:
+        w = save_dir / 'weights'  # weights dir
+        (w.parent if evolve else w).mkdir(parents=True, exist_ok=True)  # make dir
+        last, best = w / 'last.pt', w / 'best.pt'
 
     # Hyperparameters
     if isinstance(hyp, str):
@@ -84,23 +85,24 @@ def train(hyp, opt, device, callbacks, binary_weights=None, yaml_dict=None, sql_
     LOGGER.info(colorstr('hyperparameters: ') + ', '.join(f'{k}={v}' for k, v in hyp.items()))
     opt.hyp = hyp.copy()  # for saving hyps to checkpoints
     # Save run settings
-    if not evolve:
-        yaml_save(save_dir / 'hyp.yaml', hyp)
-        yaml_save(save_dir / 'opt.yaml', vars(opt))
+    if sql_stream is None:
+        if not evolve:
+            yaml_save(save_dir / 'hyp.yaml', hyp)
+            yaml_save(save_dir / 'opt.yaml', vars(opt))
     # Loggers
     data_dict = None
     if RANK in {-1, 0}:
-        loggers = Loggers(save_dir, weights, opt, hyp, LOGGER)  # loggers instance
+        if sql_stream is None:
+            loggers = Loggers(save_dir, weights, opt, hyp, LOGGER)  # loggers instance
 
-        # Register actions
-        for k in methods(loggers):
-            callbacks.register_action(k, callback=getattr(loggers, k))
+            # Register actions
+            for k in methods(loggers):
+                callbacks.register_action(k, callback=getattr(loggers, k))
 
-        # Process custom dataset artifact link
-        data_dict = loggers.remote_dataset
-        if resume:  # If resuming runs from remote artifact
-            weights, epochs, hyp, batch_size = opt.weights, opt.epochs, opt.hyp, opt.batch_size
-    # print(os.listdir("/home/erik/PycharmProjects/dynamic-yolo/project/yolo/data/model/yolo_train"))
+            # Process custom dataset artifact link
+            data_dict = loggers.remote_dataset
+            if resume:  # If resuming runs from remote artifact
+                weights, epochs, hyp, batch_size = opt.weights, opt.epochs, opt.hyp, opt.batch_size
     # Config
     plots = not evolve and not opt.noplots  # create plots
     cuda = device.type != 'cpu'
@@ -111,7 +113,6 @@ def train(hyp, opt, device, callbacks, binary_weights=None, yaml_dict=None, sql_
     nc = 1 if single_cls else int(data_dict['nc'])  # number of classes
     names = {0: 'item'} if single_cls and len(data_dict['names']) != 1 else data_dict['names']  # class names
     is_coco = isinstance(val_path, str) and val_path.endswith('coco/val2017.txt')  # COCO dataset
-
     # Model
     check_suffix(weights, '.pt')  # check weights
     pretrained = weights.endswith('.pt')
@@ -135,7 +136,6 @@ def train(hyp, opt, device, callbacks, binary_weights=None, yaml_dict=None, sql_
         else:
             model = Model(yaml_dict, ch=3, nc=nc, anchors=hyp.get('anchors')).to(device)  # create
     amp = check_amp(model)  # check AMP
-
     # Freeze
     freeze = [f'model.{x}.' for x in (freeze if len(freeze) > 1 else range(freeze[0]))]  # layers to freeze
     for k, v in model.named_parameters():
@@ -153,7 +153,6 @@ def train(hyp, opt, device, callbacks, binary_weights=None, yaml_dict=None, sql_
     if RANK == -1 and batch_size == -1:  # single-GPU only, estimate best batch size
         batch_size = check_train_batch_size(model, imgsz, amp)
         loggers.on_params_update({"batch_size": batch_size})
-
     # Optimizer
     nbs = 64  # nominal batch size
     accumulate = max(round(nbs / batch_size), 1)  # accumulate loss before optimizing
@@ -166,7 +165,6 @@ def train(hyp, opt, device, callbacks, binary_weights=None, yaml_dict=None, sql_
     else:
         lf = lambda x: (1 - x / epochs) * (1.0 - hyp['lrf']) + hyp['lrf']  # linear
     scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=lf)  # plot_lr_scheduler(optimizer, scheduler, epochs)
-
     # EMA
     ema = ModelEMA(model) if RANK in {-1, 0} else None
 
@@ -177,13 +175,11 @@ def train(hyp, opt, device, callbacks, binary_weights=None, yaml_dict=None, sql_
             best_fitness, start_epoch, epochs = smart_resume(ckpt, optimizer, ema, weights, epochs, resume)
         del ckpt, csd
 
-
     # DP mode
     if cuda and RANK == -1 and torch.cuda.device_count() > 1:
         LOGGER.warning('WARNING ⚠️ DP not recommended, use torch.distributed.run for best DDP Multi-GPU results.\n'
                        'See Multi-GPU Tutorial at https://github.com/ultralytics/yolov5/issues/475 to get started.')
         model = torch.nn.DataParallel(model)
-
     # SyncBatchNorm
     if opt.sync_bn and cuda and RANK != -1:
         model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model).to(device)
@@ -231,9 +227,7 @@ def train(hyp, opt, device, callbacks, binary_weights=None, yaml_dict=None, sql_
             if not opt.noautoanchor:
                 check_anchors(dataset, model=model, thr=hyp['anchor_t'], imgsz=imgsz)  # run AutoAnchor
             model.half().float()  # pre-reduce anchor precision
-        # print(os.listdir("/home/erik/PycharmProjects/dynamic-yolo/project/yolo/data/model/yolo_train"))
         callbacks.run('on_pretrain_routine_end', labels, names)
-        # print(os.listdir("/home/erik/PycharmProjects/dynamic-yolo/project/yolo/data/model/yolo_train"))
 
     # DDP mode
     if cuda and RANK != -1:
@@ -349,7 +343,6 @@ def train(hyp, opt, device, callbacks, binary_weights=None, yaml_dict=None, sql_
                 if callbacks.stop_training:
                     return
             # end batch ------------------------------------------------------------------------------------------------
-
         # Scheduler
         lr = [x['lr'] for x in optimizer.param_groups]  # for loggers
         scheduler.step()
@@ -381,10 +374,8 @@ def train(hyp, opt, device, callbacks, binary_weights=None, yaml_dict=None, sql_
             if fi > best_fitness:
                 best_fitness = fi
             log_vals = list(mloss) + list(results) + lr
-            # print(os.listdir("/home/erik/PycharmProjects/dynamic-yolo/project/yolo/data/model/yolo_train"))
             if not sql_stream:
                 callbacks.run('on_fit_epoch_end', log_vals, epoch, best_fitness, fi)
-            # print(os.listdir("/home/erik/PycharmProjects/dynamic-yolo/project/yolo/data/model/yolo_train"))
             # Save model
             if (not nosave) or (final_epoch and not evolve):  # if save
                 ckpt = {
@@ -408,7 +399,8 @@ def train(hyp, opt, device, callbacks, binary_weights=None, yaml_dict=None, sql_
                     if opt.save_period > 0 and epoch % opt.save_period == 0:
                         torch.save(ckpt, w / f'epoch{epoch}.pt')
                 del ckpt
-                callbacks.run('on_model_save', last, epoch, final_epoch, best_fitness, fi)
+                if sql_stream is None:
+                    callbacks.run('on_model_save', last, epoch, final_epoch, best_fitness, fi)
 
         # EarlyStopping
         if RANK != -1:  # if DDP training
@@ -422,30 +414,31 @@ def train(hyp, opt, device, callbacks, binary_weights=None, yaml_dict=None, sql_
         # end epoch ----------------------------------------------------------------------------------------------------
     # end training -----------------------------------------------------------------------------------------------------
     if RANK in {-1, 0}:
-        LOGGER.info(f'\n{epoch - start_epoch + 1} epochs completed in {(time.time() - t0) / 3600:.3f} hours.')
-        for f in last, best:
-            if f.exists():
-                strip_optimizer(f)  # strip optimizers
-                if f is best:
-                    LOGGER.info(f'\nValidating {f}...')
-                    results, _, _ = validate.run(
-                        data_dict,
-                        batch_size=batch_size // WORLD_SIZE * 2,
-                        imgsz=imgsz,
-                        model=attempt_load(f, device).half(),
-                        iou_thres=0.65 if is_coco else 0.60,  # best pycocotools at iou 0.65
-                        single_cls=single_cls,
-                        dataloader=val_loader,
-                        save_dir=save_dir,
-                        save_json=is_coco,
-                        verbose=True,
-                        plots=plots,
-                        callbacks=callbacks,
-                        compute_loss=compute_loss)  # val best model with plots
-                    if is_coco:
-                        callbacks.run('on_fit_epoch_end', list(mloss) + list(results) + lr, epoch, best_fitness, fi)
+        if sql_stream is None:
+            LOGGER.info(f'\n{epoch - start_epoch + 1} epochs completed in {(time.time() - t0) / 3600:.3f} hours.')
+            for f in last, best:
+                if f.exists():
+                    strip_optimizer(f)  # strip optimizers
+                    if f is best:
+                        LOGGER.info(f'\nValidating {f}...')
+                        results, _, _ = validate.run(
+                            data_dict,
+                            batch_size=batch_size // WORLD_SIZE * 2,
+                            imgsz=imgsz,
+                            model=attempt_load(f, device).half(),
+                            iou_thres=0.65 if is_coco else 0.60,  # best pycocotools at iou 0.65
+                            single_cls=single_cls,
+                            dataloader=val_loader,
+                            save_dir=save_dir,
+                            save_json=is_coco,
+                            verbose=True,
+                            plots=plots,
+                            callbacks=callbacks,
+                            compute_loss=compute_loss)  # val best model with plots
+                        if is_coco:
+                            callbacks.run('on_fit_epoch_end', list(mloss) + list(results) + lr, epoch, best_fitness, fi)
 
-        callbacks.run('on_train_end', last, best, epoch, results)
+            callbacks.run('on_train_end', last, best, epoch, results)
 
     torch.cuda.empty_cache()
     return results

@@ -4,7 +4,7 @@ import re
 import tarfile
 from io import BytesIO
 
-import PIL
+import PIL.Image
 from flask import Blueprint, request, jsonify
 from marshmallow import ValidationError
 from werkzeug.datastructures import MultiDict
@@ -64,6 +64,7 @@ def _text_to_annotations(content, filename):
                 raise ValidationError({"error": f"File: {name}.txt did not yolo format"})
             _list.append((Annotation(x_center=x, y_center=y, width=w, height=h, class_id=nr), name))
         except Exception as e:
+            print(e)
             raise ValidationError({"error": f"Can't read file: {name}.txt"})
             # return jsonify({'error': f"Can't read file: {name}.txt"}), 400
     return _list
@@ -72,7 +73,8 @@ def _text_to_annotations(content, filename):
 def _bytes_to_image(content, filename):
     try:
         img = PIL.Image.open(io.BytesIO(content))
-    except Exception:
+    except Exception as e:
+        print(e)
         raise ValidationError({"error": f"Can't read file: {filename}"})
     name = filename.split(".")[0]
     return Image(image=content, width=img.size[0], height=img.size[1]), name
