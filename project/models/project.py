@@ -12,7 +12,7 @@ def get_default_status_id():
 class Project(db.Model):
     id = Column(BigInteger, primary_key=True)
     name = Column(VARCHAR(128), nullable=False, unique=True)
-    times_auto_trained = Column(Integer, nullable=False, default=0)
+    auto_train_count = Column(Integer, nullable=False, default=0)
 
     latest_model_id = Column(BigInteger, ForeignKey("model.id", name="fk_latest_model"), nullable=True)
 

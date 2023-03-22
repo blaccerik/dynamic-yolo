@@ -20,6 +20,7 @@ def hello_world():
 def hello_world2():
     with open("model_27.pt", "br") as f:
         a = f.read()
+        print(len(a))
         m = Model.query.get(1)
         m.model = a
         db.session.add(m)

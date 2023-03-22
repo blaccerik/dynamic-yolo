@@ -6,6 +6,7 @@ import math
 import os
 import pathlib
 import shutil
+import sys
 import time
 
 import cv2
@@ -38,7 +39,7 @@ class Project(base):
     __tablename__ = 'project'
     id = Column(BigInteger, primary_key=True)
     name = Column(VARCHAR(128), nullable=False, unique=True)
-    times_auto_trained = Column(Integer, nullable=False, default=0)
+    auto_train_count = Column(Integer, nullable=False, default=0)
 
     latest_model_id = Column(BigInteger, ForeignKey("model.id", name="fk_latest_model"), nullable=True)
     project_status_id = Column(Integer, ForeignKey("project_status.id"), nullable=False)
@@ -310,7 +311,7 @@ class SqlStream:
 
             session.commit()
 
-        return mr
+        return metric_precision, metric_recall, metric_map_50, metric_map_50_95
 
     def distance(self, p1: Annotation, p: Prediction):
         """Calculate the Euclidean distance between two points"""
@@ -364,22 +365,20 @@ class SqlStream:
             Annotation.annotator_id != None
         )).all()
 
-        ae = aliased(AnnotationError)
-        annotations2 = session.query(
-            Annotation.id,
-            func.count(ae.human_annotation_id).label('count')
-        ).join(
-            ae,
-            ae.human_annotation_id == Annotation.id
-        ).filter(and_(
-            Annotation.image_id == image_id,
-            Annotation.annotator_id != None
-        )).group_by(
-            Annotation.id
-        ).all()
-        if image_id == 3:
-            for i in annotations2:
-                print(i)
+        # how many times has each ano appeared in errors
+        # ae = aliased(AnnotationError)
+        # annotations2 = session.query(
+        #     Annotation.id,
+        #     func.count(ae.human_annotation_id).label('count')
+        # ).join(
+        #     ae,
+        #     ae.human_annotation_id == Annotation.id
+        # ).filter(and_(
+        #     Annotation.image_id == image_id,
+        #     Annotation.annotator_id != None
+        # )).group_by(
+        #     Annotation.id
+        # ).all()
 
         # how many times image has been used
         image_used = session.query(
@@ -474,7 +473,6 @@ class TrainSession:
                  ms_test_id: int,
                  ms_ready_id: int,
                  ms_error_id: int,
-                 ps_done_id: int,
                  task_name: str):
         self.initial_model_name = name
         self.initial_model_yaml = None
@@ -489,7 +487,8 @@ class TrainSession:
         self.ss_train_id = ss_train_id
         self.ss_val_id = ss_val_id
 
-        self.ps_done_id = ps_done_id
+        self.add_to_queue = False
+        self.error = False
 
         self.skip_check = "check" not in task_name
         self.skip_train = "train" not in task_name
@@ -547,14 +546,14 @@ class TrainSession:
         # load yolo settings
         opt = detect.parse_opt(True)
 
-        setattr(opt, "weights", f"{APP_ROOT_PATH}/yolo/data/weights.pt")
-        setattr(opt, "source", f"{APP_ROOT_PATH}/yolo/data/pretest_images")
+        # setattr(opt, "weights", f"{APP_ROOT_PATH}/data/weights.pt")
+        # setattr(opt, "source", f"{APP_ROOT_PATH}/data/pretest_images")
         setattr(opt, "conf_thres", self.project_settings.min_confidence_threshold)
         setattr(opt, "iou_thres", self.project_settings.min_iou_threshold)
         setattr(opt, "imgsz", [self.project_settings.img_size, self.project_settings.img_size])
 
-        setattr(opt, "project", f"{APP_ROOT_PATH}/yolo/data/pretest_results")
-        setattr(opt, "name", "yolo_test")
+        # setattr(opt, "project", f"{APP_ROOT_PATH}/data/pretest_results")
+        # setattr(opt, "name", "yolo_test")
 
         # load model
         setattr(opt, "binary_weights", weights)
@@ -691,8 +690,8 @@ class TrainSession:
 
         # setattr(opt, "noval", True)  # validate only last epoch
         setattr(opt, "noplots", True)  # dont save plots
-        setattr(opt, "project", f"{APP_ROOT_PATH}/data/model")
-        setattr(opt, "name", "yolo_train")
+        # setattr(opt, "project", f"{APP_ROOT_PATH}/data/model")
+        # setattr(opt, "name", "yolo_train")
 
         if self.project_settings.use_ram:
             setattr(opt, "cache", "ram")
@@ -712,20 +711,16 @@ class TrainSession:
 
         try:
             train.main(opt, binary_weights=w, yaml_dict=self.initial_model_yaml, sql_stream=self.stream)  # long process
-        except torch.cuda.OutOfMemoryError as e:
-            print("out of gpu memory")
+        except (torch.cuda.OutOfMemoryError, cv2.error, RuntimeError) as e:
             print(e)
-            self.db_new_model.model_status_id = self.ms_error.id
-            db.session.add(self.db_new_model)
-            db.session.commit()
-            return True
-        except cv2.error as e:
-            print("out of ram")
-            print(e)
-            self.db_new_model.model_status_id = self.ms_error.id
-            db.session.add(self.db_new_model)
-            db.session.commit()
-            return True
+            print("out of memory")
+            self.error = True
+            with Session() as session:
+                m = session.query(Model).get(self.new_model_id)
+                m.model_status_id = self.ms_error_id
+                session.add(m)
+                session.commit()
+            return
 
         w = self.stream.best_model_weights
         with Session() as session:
@@ -735,7 +730,6 @@ class TrainSession:
             session.add(m)
             session.commit()
         self.new_model_weights = w
-        return False
 
     def load_test_yaml(self):
         # create yaml file
@@ -788,24 +782,25 @@ class TrainSession:
 
     def test(self):
         print("test")
-        if self.skip_test:
-            return False
+        if self.error or self.skip_test:
+            return
         if self.new_model_id is None:
             if self.prev_model_id is None:
-                return False
+                return
             else:
                 weights = self.prev_model_weights
                 model_id = self.prev_model_id
         else:
             weights = self.new_model_weights
             model_id = self.new_model_id
+
+        # set new status for model
         with Session() as session:
             m = session.query(Model).get(model_id)
             m.model_status_id = self.ms_test_id
             session.add(m)
             session.commit()
         self.stream.db_model_id = model_id
-
         self.load_test_yaml()
         self.load_test_data()
 
@@ -815,11 +810,11 @@ class TrainSession:
         # load yolo settings
         opt = val.parse_opt(True)
 
-        setattr(opt, "weights", f"{APP_ROOT_PATH}/data/model/yolo_train/weights/best.pt")
+        # setattr(opt, "weights", f"{APP_ROOT_PATH}/data/model/yolo_train/weights/best.pt")
         setattr(opt, "data", f"{APP_ROOT_PATH}/data/test_data.yaml")
         setattr(opt, "task", "test")
-        setattr(opt, "project", f"{APP_ROOT_PATH}/data/results")
-        setattr(opt, "name", "yolo_test")
+        # setattr(opt, "project", f"{APP_ROOT_PATH}/data/results")
+        # setattr(opt, "name", "yolo_test")
         setattr(opt, "workers", NUMBER_OF_YOLO_WORKERS)
 
         setattr(opt, "batch_size", self.project_settings.batch_size)
@@ -831,11 +826,16 @@ class TrainSession:
             results, maps, t = val.run(**settings)
         except (torch.cuda.OutOfMemoryError, RuntimeError) as e:
             print(e)
-            self.db_new_model.model_status_id = self.ms_error.id
-            db.session.add(self.db_new_model)
-            db.session.commit()
-            return True
-        mr = self.stream.add_results_to_db(results, maps, "test")
+            self.error = True
+            # change model status back to ready
+            # this model is still legal to use just testing failed
+            with Session() as session:
+                m = session.query(Model).get(model_id)
+                m.model_status_id = self.ms_ready_id
+                session.add(m)
+                session.commit()
+            return
+        metric_precision, metric_recall, metric_map_50, metric_map_50_95 = self.stream.add_results_to_db(results, maps, "test")
         # t holds speeds per image, [a, b, c]
         # a - init time
         # b - inference time
@@ -847,39 +847,33 @@ class TrainSession:
             session.commit()
 
         # dont auto train when it didnt train
-        if not self.skip_train:
-            return False
+        if self.skip_train:
+            return
 
-        if self.project.times_auto_trained >= self.project_settings.maximum_auto_train_number:
-            return False
+        # reached autotrain limit
+        if self.project.auto_train_count <= 0:
+            return
 
-        # todo redo autotrain
-        # from services.queue_service import add_to_queue  # avoid circular import
-        #
-        # # see if model needs to be retrained
-        # needs_auto_train = mr.metric_map_50 < self.project_settings.minimal_map_50_threshold or \
-        #                    mr.metric_map_50_95 < self.project_settings.minimal_map_50_95_threshold or \
-        #                    mr.metric_recall < self.project_settings.minimal_recall_threshold or \
-        #                    mr.metric_precision < self.project_settings.minimal_recall_threshold
-        #
-        # if needs_auto_train:
-        #     task_name = ""
-        #     if self.project_settings.always_check:
-        #         task_name = "check"
-        #     task_name = task_name + "train"
-        #     if self.project_settings.always_test:
-        #         task_name = task_name + "test"
-        #     add_to_queue(self.project.id, task_name, reset_counter=False)
-        return False
+        # see if model needs to be retrained
+        needs_auto_train = metric_map_50 < self.project_settings.minimal_map_50_threshold or \
+                           metric_map_50_95 < self.project_settings.minimal_map_50_95_threshold or \
+                           metric_recall < self.project_settings.minimal_recall_threshold or \
+                           metric_precision < self.project_settings.minimal_recall_threshold
+        if needs_auto_train:
+            self.add_to_queue = True
 
     def cleanup(self):
         with Session() as session:
+            # if project goes to error state
+            # then turn off auto train for it
+            if self.add_to_queue:
+                count = self.project.auto_train_count
+                self.project.auto_train_count = count - 1
+            else:
+                self.project.auto_train_count = 0
             # update model
             if self.new_model_id is not None:
                 self.project.latest_model_id = self.new_model_id
-            if not self.skip_train:
-                self.project.times_auto_trained += 1
-            self.project.project_status_id = self.ps_done_id
             session.add(self.project)
             session.commit()
 
@@ -908,12 +902,11 @@ def initialize_yolo_folders():
     create_path(f"{APP_ROOT_PATH}/data/val")
     create_path(f"{APP_ROOT_PATH}/data/val/images")
     create_path(f"{APP_ROOT_PATH}/data/val/labels")
-
-    create_path(f"{APP_ROOT_PATH}/data/pretest_images")
-    create_path(f"{APP_ROOT_PATH}/data/pretest_results")
-
-    create_path(f"{APP_ROOT_PATH}/data/results")
-    create_path(f"{APP_ROOT_PATH}/data/model")
+    # create_path(f"{APP_ROOT_PATH}/data/pretest_images")
+    # create_path(f"{APP_ROOT_PATH}/data/pretest_results")
+    #
+    # create_path(f"{APP_ROOT_PATH}/data/results")
+    # create_path(f"{APP_ROOT_PATH}/data/model")
 
 
 def create_path(path):
@@ -932,22 +925,22 @@ def start_training(project_id: int, task_id: int) -> bool:
 
         project = session.query(Project).get(project_id)
         if project is None:
-            return
+            sys.exit(1)
 
         # check settings entry
         project_settings = session.query(ProjectSettings).get(project_id)
         if project_settings is None:
-            return
+            sys.exit(1)
 
         # check if backbone file is present
         name = session.query(InitialModel).get(project_settings.initial_model_id).name
         if not os.path.isfile(f"{APP_ROOT_PATH}/yolov5/models/{name}.yaml"):
-            return True
+            sys.exit(1)
 
         # check task
         task = session.query(Task).get(task_id)
         if task is None:
-            return True
+            sys.exit(1)
 
         # check if project has test and train data
         ss_test = session.query(Subset).filter(Subset.name.like("test")).first()
@@ -967,13 +960,13 @@ def start_training(project_id: int, task_id: int) -> bool:
             Image.subset_id == ss_val.id
         )).first()
         if "check" in task.name and train_image is None:
-            return False
+            sys.exit(0)
         if "train" in task.name and train_image is None:
-            return False
+            sys.exit(0)
         if "train" in task.name and val_image is None:
-            return False
+            sys.exit(0)
         if "test" in task.name and test_image is None:
-            return False
+            sys.exit(0)
 
         # clear dirs
         if os.path.exists(f"{APP_ROOT_PATH}/data"):
@@ -984,8 +977,7 @@ def start_training(project_id: int, task_id: int) -> bool:
         ms_ready = session.query(ModelStatus).filter(ModelStatus.name.like("ready")).first()
         ms_test = session.query(ModelStatus).filter(ModelStatus.name.like("testing")).first()
         ms_error = session.query(ModelStatus).filter(ModelStatus.name.like("error")).first()
-        ps_done = session.query(ProjectStatus).filter(ProjectStatus.name.like("done")).first()
-
+    print(datetime.datetime.now())
     ts = TrainSession(
         project,
         project_settings,
@@ -997,25 +989,16 @@ def start_training(project_id: int, task_id: int) -> bool:
         ms_test.id,
         ms_ready.id,
         ms_error.id,
-        ps_done.id,
         task.name)
 
     ts.check()
-
-    error = ts.train()
-    if error:
-        print("Out of memory while training")
-        return True
-    error = ts.test()
-    if error:
-        print("Out of memory while testing")
-        return True
-    print("ts 8")
-
+    ts.train()
+    ts.test()
     ts.cleanup()
     print(datetime.datetime.now())
-
-    return False
+    if ts.error:
+        sys.exit(1)
+    sys.exit(0)
 
 
 if __name__ == '__main__':

@@ -9,6 +9,7 @@ from project.models.model_image import ModelImage
 from project.models.model_status import ModelStatus
 from project.models.project import Project
 from project.models.project_status import ProjectStatus
+from yolov5.models.experimental import attempt_load
 
 
 def get_model(model_code: int):
@@ -56,9 +57,12 @@ def upload_new_model(project_code, pt_file):
 
     try:
         binary_bytes = pt_file.read()
+        # attempt load needs to be here for torch to find yolov5 models
+        attempt_load("test", binary_weights=binary_bytes)
         file_in_bytes = io.BytesIO(binary_bytes)
-        torch_file = torch.load(file_in_bytes)
-    except:
+        torch_file = torch.load(file_in_bytes, map_location='cpu')
+    except Exception as e:
+        print(e)
         raise ValidationError('Corrupt file!')
 
     img_size_from_model = torch_file['opt']['imgsz']

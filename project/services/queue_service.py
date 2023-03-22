@@ -5,6 +5,7 @@ from sqlalchemy import func, asc
 
 from project import db
 from project.models.project import Project
+from project.models.project_settings import ProjectSettings
 from project.models.project_status import ProjectStatus
 from project.models.queue import Queue
 from project.models.task import Task
@@ -28,7 +29,6 @@ def update_queue(app):
 
         # check if anything is training
         ps = ProjectStatus.query.filter(ProjectStatus.name.like("busy")).first()
-        ps_done = ProjectStatus.query.filter(ProjectStatus.name.like("done")).first()
         ps_idle = ProjectStatus.query.filter(ProjectStatus.name.like("idle")).first()
         entry = Project.query.filter(Project.project_status_id == ps.id).first()
         if entry is not None:
@@ -40,11 +40,11 @@ def update_queue(app):
         # update project status
         project = Project.query.get(project_id)
 
-        if project.project_status_id == ps_done:
-            project.project_status_id = ps_idle
-            db.session.add(project)
-            db.session.commit()
-            return
+        # if project.project_status_id == ps_done:
+        #     project.project_status_id = ps_idle
+        #     db.session.add(project)
+        #     db.session.commit()
+        #     return
 
         # project cant be in error state
         ps_error = ProjectStatus.query.filter(ProjectStatus.name.like("error")).first()
@@ -71,23 +71,37 @@ def update_queue(app):
             return
 
         # train
-        subprocess.Popen([
+        process = subprocess.Popen([
             "python",
             "-m", "torch.distributed.run",
             "--nproc_per_node", "1",
-            "training_session/main.py",
+            "main.py",
             "--project_id", str(project.id),
             "--task_id", str(first.task_id)
         ])
-        # error = start_training(project, first.task_id)
-        # if error:
-        #     new_ps = ProjectStatus.query.filter(ProjectStatus.name.like("error")).first()
-        # else:
-        #     new_ps = ProjectStatus.query.filter(ProjectStatus.name.like("idle")).first()
-        # # set project state
-        # project.project_status_id = new_ps.id
-        # db.session.add(project)
-        # db.session.commit()
+        exit_code = process.wait()
+        print("subprocess finished")
+        db.session.refresh(project)
+        project_settings = ProjectSettings.query.get(project_id)
+        if exit_code == 0:  # all good
+            new_ps = ProjectStatus.query.filter(ProjectStatus.name.like("idle")).first()
+
+            # find if it needs to add to queue
+            if project.auto_train_count > 0:
+                task = ""
+                if project_settings.always_check:
+                    task = "check"
+                task = task + "train"
+                if project_settings.always_test:
+                    task = task + "test"
+                add_to_queue(project_id, task, reset_counter=False)
+        else:
+            new_ps = ProjectStatus.query.filter(ProjectStatus.name.like("error")).first()
+
+        db.session.refresh(project)
+        project.project_status_id = new_ps.id
+        db.session.add(project)
+        db.session.commit()
 
 
 def add_to_queue(project_id: int, task_name: str, reset_counter=True):
@@ -97,6 +111,9 @@ def add_to_queue(project_id: int, task_name: str, reset_counter=True):
     project = Project.query.get(project_id)
     if project is None:
         return "Project not found!", 1
+    project_settings = ProjectSettings.query.get(project_id)
+    if project_settings is None:
+        return "Project settings not found!", 1
 
     # search queue to see if project is already there
     # if it is then don't touch it
@@ -115,8 +132,7 @@ def add_to_queue(project_id: int, task_name: str, reset_counter=True):
     db.session.add(q)
 
     if reset_counter:
-        db.session.refresh(project)
-        project.times_auto_trained = 0
+        project.auto_train_count = project_settings.maximum_auto_train_number
         db.session.add(project)
 
     db.session.commit()

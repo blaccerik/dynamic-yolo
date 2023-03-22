@@ -2,6 +2,7 @@ import atexit
 import os
 import pathlib
 import subprocess
+import sys
 import time
 
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -26,6 +27,13 @@ APP_ROOT_PATH = pathlib.Path(__file__).parent.resolve()
 load_dotenv()
 DB_READ_BATCH_SIZE = int(os.getenv("DB_READ_BATCH_SIZE"))
 NUMBER_OF_YOLO_WORKERS = int(os.getenv("NUMBER_OF_YOLO_WORKERS"))
+
+# sys.path.insert(0, f"{APP_ROOT_PATH}/training_session/yolov5/")
+# sys.path.insert(0, f"{APP_ROOT_PATH}/training_session/yolov5/models")
+# sys.path.insert(0, './yolov5')
+sys.path.append(f"{APP_ROOT_PATH}/training_session/yolov5/models")
+sys.path.append(f"{APP_ROOT_PATH}/training_session/yolov5/")
+print(sys.path)
 
 ### swagger specific ###
 SWAGGER_URL = '/swagger'
@@ -88,7 +96,6 @@ def initialize_extensions(app):
     from project.models.model_class_results import ModelClassResult
     from project.models.annotation_extra import AnnotationError
     from project.models.task import Task
-
 
 def register_blueprints(app):
     from project.views import home
@@ -166,8 +173,7 @@ def create_database(app):
         ps1 = ProjectStatus(name="busy")
         ps2 = ProjectStatus(name="idle")
         ps3 = ProjectStatus(name="error")
-        ps4 = ProjectStatus(name="done")
-        db.session.add_all([ps1, ps2, ps3, ps4])
+        db.session.add_all([ps1, ps2, ps3])
         db.session.commit()
 
         ms1 = ModelStatus(name="ready")
