@@ -99,6 +99,9 @@ class ProjectSettings(base):
     freeze_backbone = Column(Boolean, nullable=False, default=False)
     use_ram = Column(Boolean, nullable=False, default=False)
 
+    # gpu stats
+    devices = Column(VARCHAR(128), nullable=False, default="0")
+
     # auto train
     minimal_map_50_threshold = Column(Float, nullable=False, default=0)
     minimal_map_50_95_threshold = Column(Float, nullable=False, default=0)
@@ -687,6 +690,7 @@ class TrainSession:
         setattr(opt, "batch_size", self.project_settings.batch_size)
         setattr(opt, "imgsz", self.project_settings.img_size)
         setattr(opt, "epochs", self.project_settings.epochs)
+        setattr(opt, "device", self.project_settings.devices)
 
         # setattr(opt, "noval", True)  # validate only last epoch
         setattr(opt, "noplots", True)  # dont save plots
@@ -711,9 +715,8 @@ class TrainSession:
 
         try:
             train.main(opt, binary_weights=w, yaml_dict=self.initial_model_yaml, sql_stream=self.stream)  # long process
-        except (torch.cuda.OutOfMemoryError, cv2.error, RuntimeError) as e:
+        except (torch.cuda.OutOfMemoryError, cv2.error, RuntimeError, AssertionError) as e:
             print(e)
-            print("out of memory")
             self.error = True
             with Session() as session:
                 m = session.query(Model).get(self.new_model_id)
@@ -872,7 +875,7 @@ class TrainSession:
             else:
                 self.project.auto_train_count = 0
             # update model
-            if self.new_model_id is not None:
+            if self.new_model_id is not None and self.new_model_weights is not None:
                 self.project.latest_model_id = self.new_model_id
             session.add(self.project)
             session.commit()

@@ -1,17 +1,15 @@
 import atexit
 import os
 import pathlib
-import subprocess
 import sys
-import time
 
+import torch
 from apscheduler.schedulers.background import BackgroundScheduler
 from dotenv import load_dotenv
 from flask import Flask, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from flask_swagger_ui import get_swaggerui_blueprint
 from werkzeug.serving import is_running_from_reloader
-
 
 
 # max_data_memory = int(os.getenv('RLIMIT_DATA', -1))
@@ -31,9 +29,9 @@ NUMBER_OF_YOLO_WORKERS = int(os.getenv("NUMBER_OF_YOLO_WORKERS"))
 # sys.path.insert(0, f"{APP_ROOT_PATH}/training_session/yolov5/")
 # sys.path.insert(0, f"{APP_ROOT_PATH}/training_session/yolov5/models")
 # sys.path.insert(0, './yolov5')
-sys.path.append(f"{APP_ROOT_PATH}/training_session/yolov5/models")
-sys.path.append(f"{APP_ROOT_PATH}/training_session/yolov5/")
-print(sys.path)
+# sys.path.append(f"{APP_ROOT_PATH}/training_session/yolov5/models")
+# sys.path.append(f"{APP_ROOT_PATH}/training_session/yolov5/")
+# print(sys.path)
 
 ### swagger specific ###
 SWAGGER_URL = '/swagger'
