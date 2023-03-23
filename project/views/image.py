@@ -12,11 +12,11 @@ from project.services.image_service import *
 REQUEST_API = Blueprint('images', __name__, url_prefix="/images")
 
 
-class Join:
-    def __init__(self, ae: AnnotationError, a_human: Annotation, a_model: Annotation):
-        self.a_model = a_model
-        self.a_human = a_human
-        self.ae = ae
+# class Join:
+#     def __init__(self, ae: AnnotationError, a_human: Annotation, a_model: Annotation):
+#         self.a_model = a_model
+#         self.a_human = a_human
+#         self.ae = ae
 
 
 def add_ano_to_image(cv2_image, a, text, dh, dw, color):
@@ -45,41 +45,41 @@ def add_errors(errors, show_errors, cv2_image, missing, dh, dw, color2, color3):
             add_ano_to_image(cv2_image, a, f"{a.class_id} ({i})", dh, dw, color3)
 
 
-def deal_with_annotations(image_id, show_type, show_human_annotations):
-
-    latest_model = None
-    if show_type == "latest":
-        latest_model = get_latest_model(image_id)
-
-    skip = set()
-    errors = []
-    correct = []
-
-    # get all annotations
-    anos = {a.id: a for a in get_all_annotations(image_id)}
-    not_correct = set()
-
-    # sort them
-    for ae in get_all_annotation_errors(image_id):
-        if latest_model is not None and ae.model_id != latest_model:
-            skip.add(ae.model_annotation_id)
-            continue
-        if ae.human_annotation_id is None:
-            errors.append(Join(ae, None, anos[ae.model_annotation_id]))
-        elif ae.model_annotation_id is None:
-            not_correct.add(ae.human_annotation_id)
-            errors.append(Join(ae, anos[ae.human_annotation_id], None))
-        else:
-            not_correct.add(ae.human_annotation_id)
-            errors.append(Join(ae, anos[ae.human_annotation_id], anos[ae.model_annotation_id]))
-
-    # find correct anos
-    if show_human_annotations:
-        for a in anos.values():
-            if a.id in not_correct or a.annotator_id is None:
-                continue
-            correct.append(a)
-    return errors, correct
+# def deal_with_annotations(image_id, show_type, show_human_annotations):
+#
+#     latest_model = None
+#     if show_type == "latest":
+#         latest_model = get_latest_model(image_id)
+#
+#     skip = set()
+#     errors = []
+#     correct = []
+#
+#     # get all annotations
+#     anos = {a.id: a for a in get_all_annotations(image_id)}
+#     not_correct = set()
+#
+#     # sort them
+#     for ae in get_all_annotation_errors(image_id):
+#         if latest_model is not None and ae.model_id != latest_model:
+#             skip.add(ae.model_annotation_id)
+#             continue
+#         if ae.human_annotation_id is None:
+#             errors.append(Join(ae, None, anos[ae.model_annotation_id]))
+#         elif ae.model_annotation_id is None:
+#             not_correct.add(ae.human_annotation_id)
+#             errors.append(Join(ae, anos[ae.human_annotation_id], None))
+#         else:
+#             not_correct.add(ae.human_annotation_id)
+#             errors.append(Join(ae, anos[ae.human_annotation_id], anos[ae.model_annotation_id]))
+#
+#     # find correct anos
+#     if show_human_annotations:
+#         for a in anos.values():
+#             if a.id in not_correct or a.annotator_id is None:
+#                 continue
+#             correct.append(a)
+#     return errors, correct
 
 
 @REQUEST_API.route('/<int:image_id>', methods=['GET'])
@@ -117,29 +117,29 @@ def get_image(image_id):
     errors, correct = get_errors_and_correct(image_id, error_id, show_ano, show_type)
 
     dh, dw, _ = cv2_image.shape
-    color_red = (0,0,255)
-    color_yellow = (0,255,255)
-    color_green = (0,255,0)
+    color_red = (0, 0, 255)
+    color_yellow = (0, 255, 255)
+    color_green = (0, 255, 0)
 
     skip = set()
     for ae, am, ah in errors:
         if ah is None:
-            text = f"{am.class_id} {ae.confidence:.2f}"
+            text = f"{am.class_id} {ae.confidence:.2f} {am.id}"
             add_ano_to_image(cv2_image, am, text, dh, dw, color_red)
         elif am is None:
-            text = str(ah.class_id)
+            text = f"{ah.class_id} {ah.id}"
             add_ano_to_image(cv2_image, ah, text, dh, dw, color_yellow)
         else:
-            text = str(ah.class_id)
+            text = f"{ah.class_id} {ah.id}"
             add_ano_to_image(cv2_image, ah, text, dh, dw, color_yellow)
-            text = f"{am.class_id} {ae.confidence:.2f}"
+            text = f"{am.class_id} {ae.confidence:.2f} {am.id}"
             add_ano_to_image(cv2_image, am, text, dh, dw, color_red)
             skip.add(ah.id)
 
     for a in correct:
         if a.id in skip:
             continue
-        text = str(a.class_id)
+        text = f"{a.class_id} {a.id}"
         add_ano_to_image(cv2_image, a, text, dh, dw, color_green)
 
     params = (cv2.IMWRITE_PNG_COMPRESSION, 0)

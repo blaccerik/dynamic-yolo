@@ -74,6 +74,7 @@ def get_errors_and_correct(image_code: int, error_id: int, show_human_annotation
         latest_model = get_latest_model(image_code)
 
     errors = []
+    seen = set()
     for x in get_all_annotation_errors_(image_code):
         ae, am, ah = x
         if error_id is not None:
@@ -83,6 +84,11 @@ def get_errors_and_correct(image_code: int, error_id: int, show_human_annotation
         else:
             if latest_model is not None and ae.model_id != latest_model:
                 continue
+            if am is not None:
+                values = (am.x_center, am.y_center, am.width, am.height, am.class_id)
+                if values in seen:
+                    continue
+                seen.add(values)
             errors.append(x)
 
     correct = [x for x in get_all_human_annotations(image_code) if show_human_annotations]
