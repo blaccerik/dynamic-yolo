@@ -8,6 +8,9 @@ import pathlib
 import shutil
 import sys
 import time
+from PIL import Image as Pil_Image
+from matplotlib import pyplot as plt
+
 
 import cv2
 import numpy as np
@@ -17,7 +20,7 @@ import yaml
 from dotenv import load_dotenv
 from flask_sqlalchemy.session import Session
 from sqlalchemy import and_, func, or_, create_engine, BigInteger, Column, VARCHAR, Integer, ForeignKey, LargeBinary, \
-    Float, Boolean, DateTime, PrimaryKeyConstraint
+    Float, Boolean, DateTime, PrimaryKeyConstraint, outerjoin
 from sqlalchemy.orm import aliased, sessionmaker
 
 from yolov5.utils.general import scale_boxes, xyxy2xywh
@@ -218,9 +221,12 @@ class ModelClassResult(base):
 
 class Prediction:
 
-    def __init__(self, annotation, conf):
+    def __init__(self, annotation: Annotation, conf):
         self.annotation = annotation
         self.conf = conf
+
+    def __str__(self):
+        return f"{self.annotation.id} {self.annotation.x_center} {self.annotation.y_center}"
 
 
 class SqlStream:
@@ -260,22 +266,24 @@ class SqlStream:
         while True:
             # Fetch the next batch of images
             images_batch = images.offset(start_idx).limit(batch_size).all()
-
             # If there are no more images to process, break out of the loop
             if not images_batch:
                 break
-
             for image in images_batch:
+
                 content = image.image
+
                 nparr = np.frombuffer(content, np.uint8)
 
                 # Decode numpy array into image
                 im0 = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
                 im = letterbox(im0, self.img_size, stride=self.stride, auto=self.auto)[0]  # padded resize
+
                 im = im.transpose((2, 0, 1))[::-1]  # HWC to CHW, BGR to RGB
                 im = np.ascontiguousarray(im)  # contiguous
                 yield im, im0, image.id
+
             # Commit changes to the database and start a new transaction
             session.commit()
 
@@ -316,44 +324,54 @@ class SqlStream:
 
         return metric_precision, metric_recall, metric_map_50, metric_map_50_95
 
-    def distance(self, p1: Annotation, p: Prediction):
+    def distance(self, human: Prediction, model: Prediction):
         """Calculate the Euclidean distance between two points"""
-        return math.sqrt((p1.x_center - p.annotation.x_center) ** 2 + (p1.y_center - p.annotation.y_center) ** 2)
+        return math.sqrt(
+            (human.annotation.x_center - model.annotation.x_center) ** 2 +
+            (human.annotation.y_center - model.annotation.y_center) ** 2)
 
-    def find_mappings(self, annotations, predictions):
+    def find_closest_predictions(self, list1, list2):
+        closest_distance = float('inf')
+        closest_pair = None
+
+        for pred1 in list1:
+            for pred2 in list2:
+                dist = self.distance(pred1, pred2)
+                if dist < closest_distance:
+                    closest_distance = dist
+                    closest_pair = (pred1, pred2)
+
+        return closest_pair
+
+    def find_mappings(self, human_anos, model_anos):
         mappings = []
-
-        if len(annotations) == 0:
-            for p in predictions:
-                mappings.append((p, None))
-            return mappings
-
-        # for every prediction find the closest annotation while being sorted by distance
-        for prediction in sorted(predictions,
-                                 key=lambda p: self.distance(min(annotations, key=lambda a: self.distance(a, p)), p)):
-            closest_ano = min(annotations, key=lambda a: self.distance(a, prediction))
-            # todo if distance is too large then add as seperate anos
-
-            annotations.remove(closest_ano)
-            mappings.append((prediction, closest_ano))
-            if len(annotations) == 0:
+        while len(human_anos) > 0 and len(model_anos) > 0:
+            human_ano, model_ano = self.find_closest_predictions(human_anos, model_anos)
+            distance = self.distance(human_ano, model_ano)
+            if distance > self.project_settings.check_center_difference_threshold:
                 break
-        for a in annotations:
-            mappings.append((None, a))
+            human_anos.remove(human_ano)
+            model_anos.remove(model_ano)
+            mappings.append((model_ano, human_ano))
+
+        for human_ano in human_anos:
+            mappings.append((None, human_ano))
+
+        for model_ano in model_anos:
+            mappings.append((model_ano, None))
         return mappings
 
-    def is_close_enough(self, pred: Prediction, ano: Annotation):
-        if pred is None:
+    def is_close_enough(self, model: Prediction, human: Prediction):
+        if model is None or human is None:
             return False
-        elif ano is None:
+        ano_human = human.annotation
+        ano_model = model.annotation
+        if ano_human.class_id != ano_model.class_id:
             return False
-        ano2 = pred.annotation
-        if ano2.class_id != ano.class_id:
-            return False
-        w_diff = abs(ano2.width - ano.width)
-        h_diff = abs(ano2.height - ano.height)
-        x_diff = abs(ano2.x_center - ano.x_center)
-        y_diff = abs(ano2.y_center - ano.y_center)
+        w_diff = abs(ano_human.width - ano_model.width)
+        h_diff = abs(ano_human.height - ano_model.height)
+        x_diff = abs(ano_human.x_center - ano_model.x_center)
+        y_diff = abs(ano_human.y_center - ano_model.y_center)
         return w_diff < self.project_settings.check_size_difference_threshold and \
             h_diff < self.project_settings.check_size_difference_threshold and \
             x_diff < self.project_settings.check_center_difference_threshold and \
@@ -361,29 +379,26 @@ class SqlStream:
 
     def normalize_preds(self, pred, im0, im, image_id, session):
 
-        # find all human annotations
-        annotations = session.query(Annotation).filter(and_(
-            Annotation.project_id == self.project_id,
-            Annotation.image_id == image_id,
-            Annotation.annotator_id != None
-        )).all()
-
-        # how many times has each ano appeared in errors
-        # ae = aliased(AnnotationError)
-        # annotations2 = session.query(
-        #     Annotation.id,
-        #     func.count(ae.human_annotation_id).label('count')
-        # ).join(
-        #     ae,
-        #     ae.human_annotation_id == Annotation.id
-        # ).filter(and_(
+        # # find all human annotations
+        # annotations = session.query(Annotation).filter(and_(
+        #     Annotation.project_id == self.project_id,
         #     Annotation.image_id == image_id,
         #     Annotation.annotator_id != None
-        # )).group_by(
-        #     Annotation.id
-        # ).all()
+        # )).all()
 
-        # how many times image has been used
+        # all human annotations and how many times they appeared in errors
+        annotations = session.query(
+            Annotation,
+            func.count(AnnotationError.id).filter(AnnotationError.human_annotation_id == Annotation.id).label(
+                "count")
+        ).outerjoin(AnnotationError, Annotation.id == AnnotationError.model_annotation_id).filter(and_(
+            Annotation.image_id == image_id,
+            Annotation.annotator_id != None
+        )).group_by(Annotation)
+
+        annotations = [Prediction(a, c) for a, c in annotations.all()]
+
+        # how many times image has been used in training
         image_used = session.query(
             func.sum(Model.epochs)
         ).join(
@@ -427,38 +442,35 @@ class SqlStream:
         mappings = self.find_mappings(annotations, predictions)
         is_all_correct = True
         # write results to database
-        for pred, ano in mappings:
+        for m_pred, h_pred in mappings:
+
+            if image_id == 4:
+                print("-------")
+                if h_pred is not None:
+                    print(h_pred.annotation.id)
+                print(m_pred, h_pred)
+                print(self.is_close_enough(m_pred, h_pred))
 
             # check if needs to make db entry
-            if self.is_close_enough(pred, ano):
+            if self.is_close_enough(m_pred, h_pred):
                 # if pred overlapped with annotation then there is no need to add to database
-                session.delete(pred.annotation)
+                session.delete(m_pred.annotation)
                 continue
             is_all_correct = False
 
-            # # find how many times this human ano has been in errors
-            # if ano.id in self.cache:
-            #     human_annotation_count = self.cache[ano.id]
-            # else:
-            #     count = db.session.query(func.count(AnnotationError.human_annotation_id)).filter(
-            #         AnnotationError.human_annotation_id == ano.id).scalar()
-            #     print(count)
-
             ae = AnnotationError()
-            if ano is not None:
-                ae.human_annotation_id = ano.id
-            if pred is not None:
-                ae.model_annotation_id = pred.annotation.id
-                ae.confidence = pred.conf
+            if h_pred is not None:
+                ae.human_annotation_id = h_pred.annotation.id
+                ae.human_annotation_count = h_pred.conf
+            if m_pred is not None:
+                ae.model_annotation_id = m_pred.annotation.id
+                ae.confidence = m_pred .conf
             ae.model_id = self.db_model_id
             ae.image_count = image_used
             ae.image_id = image_id
             session.add(ae)
         if is_all_correct:
             self.good_images.add(image_id)
-        # session.flush()
-        # print("flush2")
-        # session.commit()
 
 
 # needs to be here to avoid circular import error

@@ -291,7 +291,7 @@ def retrieve_annotations(project_code, page_nr, page_size):
     return annotations_to_return
 
 
-def find_score(model_class_confidence, human_class_confidence, confidence, training_amount, mr: ModelResults):
+def find_score(model_class_confidence, human_class_confidence, confidence, image_count, mr: ModelResults, human_ano_count):
 
     a = 5
     b = 7
@@ -301,15 +301,17 @@ def find_score(model_class_confidence, human_class_confidence, confidence, train
     f = 6
     g = 5
     h = 6
+    i = 0.3
 
     score = model_class_confidence * a + \
             human_class_confidence * b + \
             confidence * c + \
-            training_amount * d + \
+            image_count * d + \
             mr.metric_precision * e + \
             mr.metric_recall * f + \
             mr.metric_map_50 * g + \
-            mr.metric_map_50_95 * h
+            mr.metric_map_50_95 * h + \
+            human_ano_count * i
     return score
 
 
@@ -343,7 +345,7 @@ def retrieve_project_errors(project_code, page_nr, page_size):
             model_results[model_id] = ModelStats(mr, mcr)
 
     weighted_results = []
-    cache = {}
+    seen = set()
     # go through every mistake and give it a score
     for ae, am, ah in query:
         model_id = ae.model_id
@@ -354,15 +356,22 @@ def retrieve_project_errors(project_code, page_nr, page_size):
         model_stats = model_results[model_id]
         confidence = ae.confidence
         if confidence is None:
-            confidence = 0
-        training_amount = ae.training_amount
+            confidence = 1
+        human_annotation_count = ae.human_annotation_count
+        if human_annotation_count is None:
+            human_annotation_count = 0
+        image_count = ae.image_count
         model_class_confidence = 0
         if am is not None:
             model_class_confidence = model_stats.class_results[am.class_id]
-        human_class_confidence = 0
+            values = (am.x_center, am.y_center, am.width, am.height, am.class_id)
+            if values in seen:
+                continue
+            seen.add(values)
+        human_class_confidence = 1
         if ah is not None:
             human_class_confidence = model_stats.class_results[ah.class_id]
-        score = find_score(model_class_confidence, human_class_confidence, confidence, training_amount, model_stats.mr)
+        score = find_score(model_class_confidence, human_class_confidence, confidence, image_count, model_stats.mr, human_annotation_count)
         weighted_results.append((score, ae))
 
     weighted_results.sort(key=lambda x: x[0], reverse=True)
