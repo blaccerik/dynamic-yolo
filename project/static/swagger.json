@@ -1147,7 +1147,7 @@
             "format": "binary"
           }
         }},
-        "project_settings": {
+      "project_settings": {
           "type": "object",
           "properties": {
             "epochs": {
@@ -1166,13 +1166,33 @@
               "type": "number",
               "description": "Validation data split ratio"
             },
-            "pretest_size_difference": {
-              "type": "number"
+            "check_size_difference_threshold": {
+              "type": "number",
+              "default": 0.0
+            },
+            "check_center_difference_threshold": {
+              "type": "number",
+              "default": 0.0
             },
             "maximum_auto_train_number": {
-              "type": "number"
+              "type": "number",
+              "default": 0
             },
-            "skip_pretesting": {
+            "min_confidence_threshold": {
+              "type": "number",
+              "description": "Minimum confidence threshold for detection",
+              "default": 0.0
+            },
+            "min_iou_threshold": {
+              "type": "number",
+              "description": "Minimum intersection over union threshold for detection",
+              "default": 0.0
+            },
+            "always_test": {
+              "type": "boolean",
+              "default": false
+            },
+            "always_check": {
               "type": "boolean",
               "default": false
             },
@@ -1184,30 +1204,30 @@
               "type": "boolean",
               "default": false
             },
+            "devices": {
+              "type": "string",
+              "default": "0"
+            },
             "minimal_map_50_threshold": {
               "type": "number",
-              "description": "Minimal map threshold"
+              "description": "Minimal map threshold",
+              "default": 0.0
             },
             "minimal_map_50_95_threshold": {
-              "type": "number"
+              "type": "number",
+              "default": 0.0
             },
             "minimal_precision_threshold": {
-              "type": "number"
+              "type": "number",
+              "default": 0.0
             },
             "minimal_recall_threshold": {
-              "type": "number"
-            },
-            "min_confidence_threshold": {
               "type": "number",
-              "description": "Minimum confidence threshold for detection"
-            },
-            "min_iou_threshold": {
-              "type": "number",
-              "description": "Minimum intersection over union threshold for detection"
+              "default": 0.0
             }
           }
         },
-        "get_project_settings": {
+      "get_project_settings": {
           "type": "object",
           "properties": {
             "max_class_nr": {
@@ -1267,7 +1287,7 @@
             }
           }
         },
-        "simple_model_info": {
+      "simple_model_info": {
           "type": "object",
           "properties": {
             "model_status_name": {
@@ -1291,10 +1311,10 @@
             }
           }
         },
-        "model_id": {
+      "model_id": {
           "type": "integer"
         },
-        "simple_annotation_info": {
+      "simple_annotation_info": {
           "type": "object",
           "properties": {
             "id": {
@@ -1315,7 +1335,7 @@
             }
           }
         },
-        "image": {
+      "image": {
           "type": "object",
           "properties": {
             "id": {
@@ -1342,7 +1362,7 @@
             }
           }
         },
-        "model_info": {
+      "model_info": {
           "type": "object",
           "properties": {
             "parent_model_id": {

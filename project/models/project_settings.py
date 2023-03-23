@@ -1,11 +1,8 @@
-from select import select
-
-from sqlalchemy import VARCHAR, Column, BigInteger, ForeignKey, Integer, Float, text, Boolean
-from sqlalchemy.orm import relationship
+from sqlalchemy import VARCHAR, Column, BigInteger, ForeignKey, Integer, Float, Boolean
 
 from project import db
-from project.models.project import Project
 from project.models.initial_model import InitialModel
+from project.models.project import Project
 
 
 def get_default_name_id():
@@ -40,6 +37,9 @@ class ProjectSettings(db.Model):
     # train speed
     freeze_backbone = Column(Boolean, nullable=False, default=False)
     use_ram = Column(Boolean, nullable=False, default=False)
+
+    # gpu stats
+    devices = Column(VARCHAR(128), nullable=False, default="0")
 
     # auto train
     minimal_map_50_threshold = Column(Float, nullable=False, default=0)

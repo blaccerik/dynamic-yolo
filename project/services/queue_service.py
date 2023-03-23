@@ -70,15 +70,27 @@ def update_queue(app):
             print("project is in error state")
             return
 
+        # get devices
+        ps = ProjectSettings.query.get(project_id)
+        dev_string = str(ps.devices)
+        number = dev_string.count(",") + 1
         # train
-        process = subprocess.Popen([
-            "python",
-            "-m", "torch.distributed.run",
-            "--nproc_per_node", "1",
-            "main.py",
-            "--project_id", str(project.id),
-            "--task_id", str(first.task_id)
-        ])
+        if number <= 1:
+            process = subprocess.Popen([
+                "python",
+                "main.py",
+                "--project_id", str(project.id),
+                "--task_id", str(first.task_id)
+            ])
+        else:
+            process = subprocess.Popen([
+                "python",
+                "-m", "torch.distributed.run",
+                "--nproc_per_node", str(number),
+                "main.py",
+                "--project_id", str(project.id),
+                "--task_id", str(first.task_id)
+            ])
         exit_code = process.wait()
         print("subprocess finished")
         db.session.refresh(project)

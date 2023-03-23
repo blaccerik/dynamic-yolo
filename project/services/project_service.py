@@ -207,20 +207,27 @@ def get_settings(project_code: int) -> dict:
 
         "train_ratio": project_settings.train_ratio,
         "val_ratio": project_settings.val_ratio,
-        "pretest_size_difference_threshold": project_settings.pretest_size_difference_threshold,
+
+        "check_size_difference_threshold": project_settings.check_size_difference_threshold,
+        "check_center_difference_threshold": project_settings.check_center_difference_threshold,
+
         "maximum_auto_train_number": project_settings.maximum_auto_train_number,
-        "skip_pretesting": project_settings.skip_pretesting,
+
+        "min_confidence_threshold": project_settings.min_confidence_threshold,
+        "min_iou_threshold": project_settings.min_iou_threshold,
+
+        "always_test": project_settings.always_test,
+        "always_check": project_settings.always_check,
+
         "freeze_backbone": project_settings.freeze_backbone,
         "use_ram": project_settings.use_ram,
+
+        "devices": project_settings.devices,
 
         "minimal_map_50_threshold": project_settings.minimal_map_50_threshold,
         "minimal_map_50_95_threshold": project_settings.minimal_map_50_95_threshold,
         "minimal_precision_threshold": project_settings.minimal_precision_threshold,
-        "minimal_recall_threshold": project_settings.minimal_recall_threshold,
-
-        "min_confidence_threshold": project_settings.min_confidence_threshold,
-        "min_iou_threshold": project_settings.min_iou_threshold
-
+        "minimal_recall_threshold": project_settings.minimal_recall_threshold
     }
 
 
