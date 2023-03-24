@@ -1174,6 +1174,10 @@
               "type": "number",
               "default": 0.0
             },
+            "check_error_amount_threshold": {
+              "type": "number",
+              "default": 0,0
+            },
             "maximum_auto_train_number": {
               "type": "number",
               "default": 0
