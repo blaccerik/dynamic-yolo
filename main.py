@@ -500,7 +500,7 @@ class SqlStream:
 
         # write the BMP image on disk
         with open(f"{location}/images/{image_id}.bmp", 'wb') as f:
-            f.write(content.read())
+            f.write(content.getbuffer())
 
 
 # needs to be here to avoid circular import error
@@ -661,10 +661,14 @@ class TrainSession:
                 ))
                 image_ids = []
                 for image in images.yield_per(DB_READ_BATCH_SIZE):
+
                     # save image
                     content = image.image
-                    with open(f"{location}/images/{image.id}.png", "wb") as binary_file:
-                        binary_file.write(content)
+
+                    img = Pil_Image.open(io.BytesIO(content))
+
+                    img.save(f"{location}/images/{image.id}.bmp")
+
                     image_ids.append(image.id)
             else:
                 image_ids = self.stream.saved_images
