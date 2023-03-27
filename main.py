@@ -284,9 +284,18 @@ class SqlStream:
 
                 content = image.image
 
-                self.last_images[image.id] = content
+                # get io bytes
+                img = Pil_Image.open(io.BytesIO(content))
 
-                nparr = np.frombuffer(content, np.uint8)
+                # Convert to BMP
+                img_bmp = io.BytesIO()
+                img.save(img_bmp, format='BMP')
+                img_bmp.seek(0)
+
+                # save for later
+                self.last_images[image.id] = img_bmp
+
+                nparr = np.frombuffer(img_bmp.getvalue(), np.uint8)
 
                 # Decode numpy array into image
                 im0 = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
@@ -391,17 +400,41 @@ class SqlStream:
             y_diff < self.project_settings.check_center_difference_threshold
 
     def normalize_preds(self, pred, im0, im, image_id, session):
+
+        # all human annotations and how many times they appeared in errors
         anos = session.query(
             Annotation,
-        ).filter(and_(
+            func.count(AnnotationError.id).filter(AnnotationError.human_annotation_id == Annotation.id).label(
+                "count")
+        ).outerjoin(AnnotationError, Annotation.id == AnnotationError.model_annotation_id).filter(and_(
             Annotation.image_id == image_id,
             Annotation.annotator_id != None
-        ))
-        annotations = [Prediction(a, 0) for a in anos.all()]
+        )).group_by(Annotation)
+
+
+        # anos = session.query(
+        #     Annotation,
+        # ).filter(and_(
+        #     Annotation.image_id == image_id,
+        #     Annotation.annotator_id != None
+        # ))
+        annotations = [Prediction(a, x) for a, x in anos.all()]
+
+        # how many times image has been used in training
+        image_used = session.query(
+            func.sum(Model.epochs)
+        ).join(
+            ModelImage, ModelImage.model_id == Model.id
+        ).filter(
+            ModelImage.image_id == image_id
+        ).group_by(
+            ModelImage.image_id
+        ).scalar()
+        if image_used is None:
+            image_used = 0
 
         allowed_errors = int(len(annotations) * self.project_settings.check_error_amount_threshold)
 
-        image_used = 0
         predictions = []
         for i, det in enumerate(pred):  # per image
             gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
@@ -462,8 +495,12 @@ class SqlStream:
         content = self.last_images[image_id]
         self.saved_images.append(image_id)
         location = f"{APP_ROOT_PATH}/data/train"
-        with open(f"{location}/images/{image_id}.png", "wb") as binary_file:
-            binary_file.write(content)
+        # with open(f"{location}/images/{image_id}.png", "wb") as binary_file:
+        #     binary_file.write(content)
+
+        # write the BMP image on disk
+        with open(f"{location}/images/{image_id}.bmp", 'wb') as f:
+            f.write(content.read())
 
 
 # needs to be here to avoid circular import error
