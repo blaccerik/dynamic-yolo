@@ -10,6 +10,7 @@ class ProjectSettingsSchema(Schema):
 
     check_size_difference_threshold = fields.Float(required=False)
     check_center_difference_threshold = fields.Float(required=False)
+    check_error_amount_threshold = fields.Float(required=False)
 
     maximum_auto_train_number = fields.Integer(required=False)
 
@@ -38,6 +39,7 @@ class ProjectSettingsSchema(Schema):
 
         self.in_range("check_size_difference_threshold", data)
         self.in_range("check_center_difference_threshold", data)
+        self.in_range("check_error_amount_threshold", data)
 
         self.between("maximum_auto_train_number", data, 50)
 

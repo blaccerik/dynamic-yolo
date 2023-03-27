@@ -29,7 +29,6 @@ def update_queue(app):
 
         # check if anything is training
         ps = ProjectStatus.query.filter(ProjectStatus.name.like("busy")).first()
-        ps_idle = ProjectStatus.query.filter(ProjectStatus.name.like("idle")).first()
         entry = Project.query.filter(Project.project_status_id == ps.id).first()
         if entry is not None:
             return
@@ -39,12 +38,6 @@ def update_queue(app):
 
         # update project status
         project = Project.query.get(project_id)
-
-        # if project.project_status_id == ps_done:
-        #     project.project_status_id = ps_idle
-        #     db.session.add(project)
-        #     db.session.commit()
-        #     return
 
         # project cant be in error state
         ps_error = ProjectStatus.query.filter(ProjectStatus.name.like("error")).first()

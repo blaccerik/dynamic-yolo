@@ -210,6 +210,7 @@ def get_settings(project_code: int) -> dict:
 
         "check_size_difference_threshold": project_settings.check_size_difference_threshold,
         "check_center_difference_threshold": project_settings.check_center_difference_threshold,
+        "check_error_amount_threshold": project_settings.check_error_amount_threshold,
 
         "maximum_auto_train_number": project_settings.maximum_auto_train_number,
 

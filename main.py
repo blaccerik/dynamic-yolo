@@ -88,6 +88,7 @@ class ProjectSettings(base):
     # error detection
     check_size_difference_threshold = Column(Float, nullable=False, default=0.05)
     check_center_difference_threshold = Column(Float, nullable=False, default=0.1)
+    check_error_amount_threshold = Column(Float, nullable=False, default=0.1)
 
     maximum_auto_train_number = Column(Integer, nullable=False, default=3)
 
@@ -223,15 +224,16 @@ class Prediction:
 
     def __init__(self, annotation: Annotation, conf):
         self.annotation = annotation
+        if conf is None:
+            conf = 0
         self.conf = conf
 
     def __str__(self):
         return f"{self.annotation.id} {self.annotation.x_center} {self.annotation.y_center}"
 
-
 class SqlStream:
 
-    def __init__(self, project_id, project_settings, ss_val_id, ss_test_id, ss_train_id):
+    def __init__(self, project_id, project_settings, ss_val_id, ss_test_id, ss_train_id, skip_train):
         self.project_id = project_id
         self.project_settings = project_settings
         self.ss_val_id = ss_val_id
@@ -240,8 +242,16 @@ class SqlStream:
         self.db_model_id = None
 
         self.best_model_weights = None
-        self.good_images = set()
+        self.skip_train = skip_train
+        self.skipped_count = 0
         self.cache = {}
+
+        # check caching
+        self.last_images = {}
+        self.saved_images = []
+
+        # anos
+        self.annotation_cache = {}
 
         # yolo dataloader
         self.img_size = [project_settings.img_size, project_settings.img_size]
@@ -269,11 +279,23 @@ class SqlStream:
             # If there are no more images to process, break out of the loop
             if not images_batch:
                 break
+            self.last_images = {}
             for image in images_batch:
 
                 content = image.image
 
-                nparr = np.frombuffer(content, np.uint8)
+                # get io bytes
+                img = Pil_Image.open(io.BytesIO(content))
+
+                # Convert to BMP
+                img_bmp = io.BytesIO()
+                img.save(img_bmp, format='BMP')
+                img_bmp.seek(0)
+
+                # save for later
+                self.last_images[image.id] = img_bmp
+
+                nparr = np.frombuffer(img_bmp.getvalue(), np.uint8)
 
                 # Decode numpy array into image
                 im0 = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
@@ -379,15 +401,8 @@ class SqlStream:
 
     def normalize_preds(self, pred, im0, im, image_id, session):
 
-        # # find all human annotations
-        # annotations = session.query(Annotation).filter(and_(
-        #     Annotation.project_id == self.project_id,
-        #     Annotation.image_id == image_id,
-        #     Annotation.annotator_id != None
-        # )).all()
-
         # all human annotations and how many times they appeared in errors
-        annotations = session.query(
+        anos = session.query(
             Annotation,
             func.count(AnnotationError.id).filter(AnnotationError.human_annotation_id == Annotation.id).label(
                 "count")
@@ -396,7 +411,14 @@ class SqlStream:
             Annotation.annotator_id != None
         )).group_by(Annotation)
 
-        annotations = [Prediction(a, c) for a, c in annotations.all()]
+
+        # anos = session.query(
+        #     Annotation,
+        # ).filter(and_(
+        #     Annotation.image_id == image_id,
+        #     Annotation.annotator_id != None
+        # ))
+        annotations = [Prediction(a, x) for a, x in anos.all()]
 
         # how many times image has been used in training
         image_used = session.query(
@@ -410,6 +432,8 @@ class SqlStream:
         ).scalar()
         if image_used is None:
             image_used = 0
+
+        allowed_errors = int(len(annotations) * self.project_settings.check_error_amount_threshold)
 
         predictions = []
         for i, det in enumerate(pred):  # per image
@@ -440,23 +464,16 @@ class SqlStream:
                     predictions.append(Prediction(ano, conf))
         session.flush()
         mappings = self.find_mappings(annotations, predictions)
-        is_all_correct = True
+
         # write results to database
         for m_pred, h_pred in mappings:
-
-            if image_id == 4:
-                print("-------")
-                if h_pred is not None:
-                    print(h_pred.annotation.id)
-                print(m_pred, h_pred)
-                print(self.is_close_enough(m_pred, h_pred))
 
             # check if needs to make db entry
             if self.is_close_enough(m_pred, h_pred):
                 # if pred overlapped with annotation then there is no need to add to database
                 session.delete(m_pred.annotation)
                 continue
-            is_all_correct = False
+            allowed_errors -= 1
 
             ae = AnnotationError()
             if h_pred is not None:
@@ -469,8 +486,21 @@ class SqlStream:
             ae.image_count = image_used
             ae.image_id = image_id
             session.add(ae)
-        if is_all_correct:
-            self.good_images.add(image_id)
+        if allowed_errors < 0 and not self.skip_train:
+            self._save_image(image_id)
+        elif allowed_errors >= 0:
+            self.skipped_count += 1
+
+    def _save_image(self, image_id):
+        content = self.last_images[image_id]
+        self.saved_images.append(image_id)
+        location = f"{APP_ROOT_PATH}/data/train"
+        # with open(f"{location}/images/{image_id}.png", "wb") as binary_file:
+        #     binary_file.write(content)
+
+        # write the BMP image on disk
+        with open(f"{location}/images/{image_id}.bmp", 'wb') as f:
+            f.write(content.read())
 
 
 # needs to be here to avoid circular import error
@@ -492,6 +522,7 @@ class TrainSession:
         self.initial_model_name = name
         self.initial_model_yaml = None
         self.is_new_model = True
+        self.skip_loading_train_data = False
 
         self.ms_train_id = ms_train_id
         self.ms_test_id = ms_test_id
@@ -532,7 +563,8 @@ class TrainSession:
             self.project_settings,
             self.ss_val_id,
             self.ss_test_id,
-            self.ss_train_id)
+            self.ss_train_id,
+            self.skip_train)
 
     def check(self):
         print("check")
@@ -584,6 +616,7 @@ class TrainSession:
             m.model_status_id = self.ms_ready_id
             session.add(m)
             session.commit()
+        print("skipping", self.stream.skipped_count)
 
     def __init_new_db_model__(self):
         with Session() as session:
@@ -616,26 +649,55 @@ class TrainSession:
             with open(f'{APP_ROOT_PATH}/data/backbone.yaml', 'w') as outfile:
                 yaml.dump(yaml_file, outfile, default_flow_style=False)
 
-    def load_train_data(self):
+    def _load_train_data(self):
+        start = time.time()
+        with Session() as session:
+            location = f"{APP_ROOT_PATH}/data/train"
+            if self.skip_check:
+                # load train data
+                images = session.query(Image).filter(and_(
+                    Image.project_id == self.project.id,
+                    Image.subset_id == self.ss_train_id,
+                ))
+                image_ids = []
+                for image in images.yield_per(DB_READ_BATCH_SIZE):
+                    # save image
+                    content = image.image
+                    with open(f"{location}/images/{image.id}.png", "wb") as binary_file:
+                        binary_file.write(content)
+                    image_ids.append(image.id)
+            else:
+                image_ids = self.stream.saved_images
+            for image_id in image_ids:
+                annotations = session.query(Annotation).filter(and_(
+                    Annotation.project_id == self.project.id,
+                    Annotation.image_id == image_id,
+                    Annotation.annotator_id != None
+                ))
+                text = ""
+                # save label
+                for a in annotations:
+                    line = f"{a.class_id} {a.x_center} {a.y_center} {a.width} {a.height}\n"
+                    text += line
+                with open(f"{location}/labels/{image_id}.txt", "w") as text_file:
+                    text_file.write(text)
+
+                # create db entry
+                mi = ModelImage(model_id=self.new_model_id, image_id=image_id)
+                session.add(mi)
+        end = time.time()
+        print("train load total", end-start)
+
+    def _load_val_data(self):
+        start = time.time()
         with Session() as session:
             # load data
-            images = session.query(Image).filter(
-                and_(Image.project_id == self.project.id,
-                     or_(
-                         Image.subset_id == self.ss_train_id,
-                         Image.subset_id == self.ss_val_id
-                     )))
-
+            images = session.query(Image).filter(and_(
+                Image.project_id == self.project.id,
+                Image.subset_id == self.ss_val_id
+            ))
+            location = f"{APP_ROOT_PATH}/data/val"
             for image in images.yield_per(DB_READ_BATCH_SIZE):
-                if image.subset_id == self.ss_train_id:
-                    if image.id in self.stream.good_images:
-                        continue
-                    location = f"{APP_ROOT_PATH}/data/train"
-                elif image.subset_id == self.ss_val_id:
-                    location = f"{APP_ROOT_PATH}/data/val"
-                else:
-                    raise RuntimeError("wrogn subset id")
-
                 # save image
                 content = image.image
                 with open(f"{location}/images/{image.id}.png", "wb") as binary_file:
@@ -659,6 +721,8 @@ class TrainSession:
                 session.add(mi)
 
             session.commit()
+        end = time.time()
+        print("val load total", end - start)
 
     def load_train_yaml(self):
         # create yaml file
@@ -687,7 +751,9 @@ class TrainSession:
         # load data
         self.load_model()
         self.load_train_yaml()
-        self.load_train_data()
+        self._load_train_data()
+        self._load_val_data()
+        # self.load_train_data()
         self.stream.db_model_id = self.new_model_id
 
         # set logging to warning to see much less info at console
@@ -1005,9 +1071,14 @@ def start_training(project_id: int, task_id: int) -> bool:
         ms_ready.id,
         ms_error.id,
         task.name)
-
+    start = time.time()
     ts.check()
+    end = time.time()
+    print("check", end - start)
+    start = time.time()
     ts.train()
+    end = time.time()
+    print("train", end - start)
     ts.test()
     ts.cleanup()
     print(datetime.datetime.now())
@@ -1015,10 +1086,87 @@ def start_training(project_id: int, task_id: int) -> bool:
         sys.exit(1)
     sys.exit(0)
 
+def super_test():
+    start = time.time()
+    with Session() as session:
+        session.query()
+
+        images = session.query(Image).filter(and_(
+            Image.project_id == 4,
+            Image.subset_id == 2
+        ))
+        batch_size = DB_READ_BATCH_SIZE
+        start_idx = 0
+        while True:
+            # Fetch the next batch of images
+            images_batch = images.offset(start_idx).limit(batch_size).all()
+            # If there are no more images to process, break out of the loop
+            if not images_batch:
+                break
+            image_ids = [image.id for image in images_batch]
+            annotations = session.query(Annotation).filter(and_(
+                Annotation.image_id.in_(image_ids),
+                Annotation.annotator_id != None
+            )).all()
+            cache = {}
+            for annotation in annotations:
+                index = annotation.image_id
+                if index in cache:
+                    cache[index].append(annotation)
+                else:
+                    cache[index] = [annotation]
+            for image in images_batch:
+                content = image.image
+                if image.id in cache:
+                    anos = cache[image.id]
+                else:
+                    anos = []
+
+            # Update the start index for the next batch
+            start_idx += batch_size
+            # break
+    end = time.time()
+    print("took", end - start) # 15.2 seconds
+    # start = time.time()
+    # with Session() as session:
+    #     session.query()
+    #
+    #     images = session.query(Image).filter(and_(
+    #         Image.project_id == 4,
+    #         Image.subset_id == 2
+    #     ))
+    #     batch_size = DB_READ_BATCH_SIZE
+    #     start_idx = 0
+    #     while True:
+    #         # Fetch the next batch of images
+    #         images_batch = images.offset(start_idx).limit(batch_size).all()
+    #         # If there are no more images to process, break out of the loop
+    #         if not images_batch:
+    #             break
+    #         for annotation in annotations:
+    #             index = annotation.image_id
+    #             if index in cache:
+    #                 cache[index].append(annotation)
+    #             else:
+    #                 cache[index] = [annotation]
+    #         for image in images_batch:
+    #             content = image.image
+    #             anos = session.query(Annotation).filter(and_(
+    #                 Annotation.image_id == image.id,
+    #                 Annotation.annotator_id != None
+    #             )).all()
+    #
+    #         # Update the start index for the next batch
+    #         start_idx += batch_size
+    # end = time.time()
+    # print("took", end - start) # 16.5 seconds
+
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--project_id', type=int)
     parser.add_argument('--task_id', type=int)
     args = parser.parse_args()
+    # super_test()
     start_training(args.project_id, args.task_id)

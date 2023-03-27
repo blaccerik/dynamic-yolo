@@ -24,6 +24,7 @@ class ProjectSettings(db.Model):
     # error detection
     check_size_difference_threshold = Column(Float, nullable=False, default=0.05)
     check_center_difference_threshold = Column(Float, nullable=False, default=0.1)
+    check_error_amount_threshold = Column(Float, nullable=False, default=0.1)
 
     maximum_auto_train_number = Column(Integer, nullable=False, default=3)
 

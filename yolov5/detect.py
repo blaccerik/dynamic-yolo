@@ -130,15 +130,12 @@ def run(
                     im /= 255  # 0 - 255 to 0.0 - 1.0
                     if len(im.shape) == 3:
                         im = im[None]  # expand for batch dim
-
                 # Inference
                 with dt[1]:
                     pred = model(im, augment=augment, visualize=False)
-
                 # NMS
                 with dt[2]:
                     pred = non_max_suppression(pred, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)
-
                 # preds
                 sql_stream.normalize_preds(pred, im0, im, image_id, session)
     else:
