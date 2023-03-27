@@ -653,7 +653,7 @@ class TrainSession:
         start = time.time()
         with Session() as session:
             location = f"{APP_ROOT_PATH}/data/train"
-            if self.skip_check:
+            if self.skip_check or self.prev_model_id is None:
                 # load train data
                 images = session.query(Image).filter(and_(
                     Image.project_id == self.project.id,
