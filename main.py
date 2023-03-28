@@ -1045,12 +1045,24 @@ def start_training(project_id: int, task_id: int) -> bool:
             Image.subset_id == ss_val.id
         )).first()
         if "check" in task.name and train_image is None:
+            project.auto_train_count = 0
+            session.add(project)
+            session.commit()
             sys.exit(0)
         if "train" in task.name and train_image is None:
+            project.auto_train_count = 0
+            session.add(project)
+            session.commit()
             sys.exit(0)
         if "train" in task.name and val_image is None:
+            project.auto_train_count = 0
+            session.add(project)
+            session.commit()
             sys.exit(0)
         if "test" in task.name and test_image is None:
+            project.auto_train_count = 0
+            session.add(project)
+            session.commit()
             sys.exit(0)
 
         # clear dirs
@@ -1090,81 +1102,6 @@ def start_training(project_id: int, task_id: int) -> bool:
         sys.exit(1)
     sys.exit(0)
 
-def super_test():
-    start = time.time()
-    with Session() as session:
-        session.query()
-
-        images = session.query(Image).filter(and_(
-            Image.project_id == 4,
-            Image.subset_id == 2
-        ))
-        batch_size = DB_READ_BATCH_SIZE
-        start_idx = 0
-        while True:
-            # Fetch the next batch of images
-            images_batch = images.offset(start_idx).limit(batch_size).all()
-            # If there are no more images to process, break out of the loop
-            if not images_batch:
-                break
-            image_ids = [image.id for image in images_batch]
-            annotations = session.query(Annotation).filter(and_(
-                Annotation.image_id.in_(image_ids),
-                Annotation.annotator_id != None
-            )).all()
-            cache = {}
-            for annotation in annotations:
-                index = annotation.image_id
-                if index in cache:
-                    cache[index].append(annotation)
-                else:
-                    cache[index] = [annotation]
-            for image in images_batch:
-                content = image.image
-                if image.id in cache:
-                    anos = cache[image.id]
-                else:
-                    anos = []
-
-            # Update the start index for the next batch
-            start_idx += batch_size
-            # break
-    end = time.time()
-    print("took", end - start) # 15.2 seconds
-    # start = time.time()
-    # with Session() as session:
-    #     session.query()
-    #
-    #     images = session.query(Image).filter(and_(
-    #         Image.project_id == 4,
-    #         Image.subset_id == 2
-    #     ))
-    #     batch_size = DB_READ_BATCH_SIZE
-    #     start_idx = 0
-    #     while True:
-    #         # Fetch the next batch of images
-    #         images_batch = images.offset(start_idx).limit(batch_size).all()
-    #         # If there are no more images to process, break out of the loop
-    #         if not images_batch:
-    #             break
-    #         for annotation in annotations:
-    #             index = annotation.image_id
-    #             if index in cache:
-    #                 cache[index].append(annotation)
-    #             else:
-    #                 cache[index] = [annotation]
-    #         for image in images_batch:
-    #             content = image.image
-    #             anos = session.query(Annotation).filter(and_(
-    #                 Annotation.image_id == image.id,
-    #                 Annotation.annotator_id != None
-    #             )).all()
-    #
-    #         # Update the start index for the next batch
-    #         start_idx += batch_size
-    # end = time.time()
-    # print("took", end - start) # 16.5 seconds
-
 
 
 if __name__ == '__main__':
@@ -1172,5 +1109,4 @@ if __name__ == '__main__':
     parser.add_argument('--project_id', type=int)
     parser.add_argument('--task_id', type=int)
     args = parser.parse_args()
-    # super_test()
     start_training(args.project_id, args.task_id)
