@@ -98,7 +98,6 @@ def initialize_extensions(app):
 def register_blueprints(app):
     from project.views import home
     from project.views import upload
-    from project.views import upload_classes
     from project.views import users
     from project.views import project
     from project.views import queue
@@ -111,7 +110,6 @@ def register_blueprints(app):
     from project.exceptions import user_not_authorized
     from project.exceptions import validation_error
 
-    app.register_blueprint(upload_classes.mod)
     app.register_blueprint(home.mod)
     app.register_blueprint(upload.REQUEST_API)
     app.register_blueprint(users.REQUEST_API)

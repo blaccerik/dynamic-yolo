@@ -24,7 +24,4 @@ def get_results():
 @REQUEST_API.route('/<int:result_id>', methods=['GET'])
 def get_detailed_result(result_id):
     detailed_result = retrieve_detailed_results(result_id)
-    if not detailed_result:
-        return jsonify({'error': f'Result with the ID of {result_id} was not found!'}), 404
-
     return jsonify(detailed_result), 200

@@ -107,6 +107,46 @@
         }
       }
     },
+    "/projects/{project_id}/upload_classes": {
+      "post": {
+        "tags": [
+          "Project Requests"
+        ],
+        "summary": "Upload class names to project",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "description": "Project id",
+            "schema": {
+              "$ref": "#/components/schemas/project_id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        }
+      }
+    },
     "/projects/{project_id}": {
       "get": {
         "tags": [
@@ -998,7 +1038,7 @@
               "type": "string",
               "enum": [
                 "test",
-                "train"
+                "val"
               ]
             }
           },
@@ -1176,7 +1216,7 @@
             },
             "check_error_amount_threshold": {
               "type": "number",
-              "default": 0,0
+              "default": 0.0
             },
             "maximum_auto_train_number": {
               "type": "number",

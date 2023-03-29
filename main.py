@@ -229,8 +229,7 @@ class Prediction:
         self.conf = conf
 
     def __str__(self):
-        return f"{self.annotation.id} {self.annotation.x_center} {self.annotation.y_center}"
-
+        return f"{self.annotation.id} {self.annotation.x_center} {self.annotation.y_center} {self.conf}"
 class SqlStream:
 
     def __init__(self, project_id, project_settings, ss_val_id, ss_test_id, ss_train_id, skip_train):
@@ -406,20 +405,12 @@ class SqlStream:
             Annotation,
             func.count(AnnotationError.id).filter(AnnotationError.human_annotation_id == Annotation.id).label(
                 "count")
-        ).outerjoin(AnnotationError, Annotation.id == AnnotationError.model_annotation_id).filter(and_(
+        ).outerjoin(AnnotationError, Annotation.id == AnnotationError.human_annotation_id).filter(and_(
             Annotation.image_id == image_id,
             Annotation.annotator_id != None
         )).group_by(Annotation)
 
-
-        # anos = session.query(
-        #     Annotation,
-        # ).filter(and_(
-        #     Annotation.image_id == image_id,
-        #     Annotation.annotator_id != None
-        # ))
         annotations = [Prediction(a, x) for a, x in anos.all()]
-
         # how many times image has been used in training
         image_used = session.query(
             func.sum(Model.epochs)
@@ -689,6 +680,7 @@ class TrainSession:
                 # create db entry
                 mi = ModelImage(model_id=self.new_model_id, image_id=image_id)
                 session.add(mi)
+            session.commit()
         end = time.time()
         print("train load total", end-start)
 
@@ -739,7 +731,10 @@ class TrainSession:
         with Session() as session:
             # if possible add names to
             for i in range(self.project_settings.max_class_nr):
-                image_class = session.query(ImageClass).get((self.project.id, i))
+                image_class = session.query(ImageClass).filter(and_(
+                    ImageClass.project_id == self.project.id,
+                    ImageClass.class_id == i
+                )).first()
                 if image_class is None:
                     data["names"][i] = i
                 else:
@@ -827,7 +822,10 @@ class TrainSession:
         with Session() as session:
             # if possible add names to
             for i in range(self.project_settings.max_class_nr):
-                image_class = session.query(ImageClass).get((self.project.id, i))
+                image_class = session.query(ImageClass).filter(and_(
+                    ImageClass.project_id == self.project.id,
+                    ImageClass.class_id == i
+                )).first()
                 if image_class is None:
                     data["names"][i] = i
                 else:
