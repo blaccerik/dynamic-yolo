@@ -1,4 +1,6 @@
 from marshmallow import ValidationError
+from sqlalchemy import and_
+from werkzeug.utils import secure_filename
 
 from project import db
 from project.exceptions.user_not_authorized import UserNotAuthorized
@@ -20,22 +22,6 @@ class DictStorage:
         self.annotations = []
         self.has_annotations = False
         self.image = None
-
-def upload_classes_to_db(project_name: str, classes: dict):
-    """
-    Upload classes to database.
-    :param project_name: name of the project that the classes belong to
-    :param classes: various classes {0:'dog',1:'cat'}
-    """
-    project = Project.query.filter_by(name=project_name).first()
-
-    if project is None:
-        return "Project is unknown"
-
-    for class_nr, class_name in classes.items():
-        i = ImageClass(project_id=project.id, name=class_name, class_id=class_nr)
-        db.session.add(i)
-    db.session.commit()
 
 
 def upload_file(file):
@@ -185,22 +171,40 @@ def upload_files(files: list, project_code: int, uploader: str, split: str) -> (
     return passed_images_number, failed_images_number, annotations_number
 
 
-def check_existing_annotations(project_name: str):
-    """
-    Check the already existing annotations and remove them if they have a class
-    that does not exist in the database
-    :return:
-    """
-    project = Project.query.filter_by(name=project_name).first()
 
-    annotations_to_delete = (
-        db.session.query(Annotation)
-        .filter(Annotation.project_id == project.id)
-        .filter(
-            ~Annotation.class_id.in_(db.session.query(ImageClass.class_id).filter(ImageClass.project_id == project.id)))
-        .all()
-    )
-    for annotation in annotations_to_delete:
-        db.session.delete(annotation)
-
+def upload_class_file(file, project_code: int):
+    project = Project.query.get(project_code)
+    if project is None:
+        raise ValidationError({"error":  f"Project not found"})
+    project_settings = ProjectSettings.query.get(project_code)
+    if project_settings is None:
+        raise ValidationError({"error": f"Project settings not found"})
+    max_class_nr = project_settings.max_class_nr
+    content = file.stream.read()
+    file.stream.close()
+    text = str(content, "utf-8")
+    if text == "":
+        raise ValidationError({"error": f"Cant read this file"})
+    classes = []
+    for line in text.splitlines():
+        try:
+            nr, name = line.split(" ")
+            nr = int(nr)
+            if nr >= max_class_nr or nr < 0:
+                raise ValidationError({"error": f"Class id is out of range"})
+            classes.append((nr, name))
+        except:
+            raise ValidationError({"error": f"Cant read this file"})
+    for nr, name in classes:
+        ic = ImageClass.query.filter(and_(
+            ImageClass.class_id == nr,
+            ImageClass.project_id == project_code
+        )).first()
+        if ic is None:
+            ic = ImageClass(project_id=project_code, class_id=nr, name=name)
+        else:
+            ic.name = name
+        db.session.add(ic)
     db.session.commit()
+
+

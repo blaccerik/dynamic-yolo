@@ -67,9 +67,11 @@ def get_project_info(project_code: int):
 
     test_subset_id = Subset.query.filter_by(name='test').first().id
     train_subset_id = Subset.query.filter_by(name='train').first().id
+    val_subset_id = Subset.query.filter_by(name='val').first().id
 
     training_images = Image.query.filter_by(project_id=project_code, subset_id=train_subset_id).count()
     test_images = Image.query.filter_by(project_id=project_code, subset_id=test_subset_id).count()
+    val_images = Image.query.filter_by(project_id=project_code, subset_id=val_subset_id).count()
     test_images_annotations = Annotation.query.join(Image).join(Subset).filter(and_(
         Subset.id == test_subset_id,
         Annotation.project_id == project_code
@@ -78,13 +80,16 @@ def get_project_info(project_code: int):
         Subset.id == train_subset_id,
         Annotation.project_id == project_code
     )).count()
+    val_images_annotations = Annotation.query.join(Image).join(Subset).filter(and_(
+        Subset.id == val_subset_id,
+        Annotation.project_id == project_code
+    )).count()
     total_models_in_project = Model.query.filter(Model.project_id == project_code).count()
-
-    m = Model.query.get(project.latest_model_id)
-    if m is None:
+    latest = project.latest_model_id
+    if latest is None:
         total_epochs = 0
     else:
-        total_epochs = m.total_epochs
+        total_epochs = Model.query.get(latest).total_epochs
 
     project_info = {
         'name': project.name,
@@ -93,7 +98,10 @@ def get_project_info(project_code: int):
         'train_annotations': training_images_annotations,
         'test_images_amount': test_images,
         'test_annotations': test_images_annotations,
+        'val_images_amount': val_images,
+        'val_annotations': val_images_annotations,
         'amount_of_models': total_models_in_project,
+        "latest_model_id": latest,
         'total_epochs_trained': total_epochs
     }
     return project_info

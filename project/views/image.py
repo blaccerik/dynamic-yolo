@@ -1,22 +1,13 @@
+from io import BytesIO
+
 import cv2
 import numpy as np
 from flask import Blueprint, jsonify, send_file, request
 
-from io import BytesIO
-
-from marshmallow import ValidationError
-
-from project.models.annotation import Annotation
+from project.models.image_class import ImageClass
 from project.services.image_service import *
 
 REQUEST_API = Blueprint('images', __name__, url_prefix="/images")
-
-
-# class Join:
-#     def __init__(self, ae: AnnotationError, a_human: Annotation, a_model: Annotation):
-#         self.a_model = a_model
-#         self.a_human = a_human
-#         self.ae = ae
 
 
 def add_ano_to_image(cv2_image, a, text, dh, dw, color):
@@ -24,11 +15,6 @@ def add_ano_to_image(cv2_image, a, text, dh, dw, color):
     r = int((a.x_center + a.width / 2) * dw)
     t = int((a.y_center - a.height / 2) * dh)
     b = int((a.y_center + a.height / 2) * dh)
-    # if a.id == 36 or a.id == 9562:
-    #     print(a)
-    #     print(a.x_center)
-    #     print(a.y_center)
-    #     print(l, r, t, b)
     cv2.rectangle(cv2_image, (l, t), (r, b), color, 1)
     cv2.putText(cv2_image, text, (l, t - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
 
@@ -45,41 +31,15 @@ def add_errors(errors, show_errors, cv2_image, missing, dh, dw, color2, color3):
             add_ano_to_image(cv2_image, a, f"{a.class_id} ({i})", dh, dw, color3)
 
 
-# def deal_with_annotations(image_id, show_type, show_human_annotations):
-#
-#     latest_model = None
-#     if show_type == "latest":
-#         latest_model = get_latest_model(image_id)
-#
-#     skip = set()
-#     errors = []
-#     correct = []
-#
-#     # get all annotations
-#     anos = {a.id: a for a in get_all_annotations(image_id)}
-#     not_correct = set()
-#
-#     # sort them
-#     for ae in get_all_annotation_errors(image_id):
-#         if latest_model is not None and ae.model_id != latest_model:
-#             skip.add(ae.model_annotation_id)
-#             continue
-#         if ae.human_annotation_id is None:
-#             errors.append(Join(ae, None, anos[ae.model_annotation_id]))
-#         elif ae.model_annotation_id is None:
-#             not_correct.add(ae.human_annotation_id)
-#             errors.append(Join(ae, anos[ae.human_annotation_id], None))
-#         else:
-#             not_correct.add(ae.human_annotation_id)
-#             errors.append(Join(ae, anos[ae.human_annotation_id], anos[ae.model_annotation_id]))
-#
-#     # find correct anos
-#     if show_human_annotations:
-#         for a in anos.values():
-#             if a.id in not_correct or a.annotator_id is None:
-#                 continue
-#             correct.append(a)
-#     return errors, correct
+def gen_text(classes_dict, ano, conf):
+    if ano.class_id in classes_dict:
+        text = f"{classes_dict[ano.class_id]}"
+    else:
+        text = f"{ano.class_id}"
+    text = text + f" {ano.id}"
+    if conf is not None:
+        text = text + f" {conf:.2f}"
+    return text
 
 
 @REQUEST_API.route('/<int:image_id>', methods=['GET'])
@@ -122,24 +82,32 @@ def get_image(image_id):
     color_green = (0, 255, 0)
 
     skip = set()
+    classes = ImageClass.query.filter(ImageClass.project_id == image.project_id).all()
+    classes_dict = {}
+    for c in classes:
+        if c is None:
+            continue
+        classes_dict[c.class_id] = c.name
     for ae, am, ah in errors:
         if ah is None:
-            text = f"{am.class_id} {ae.confidence:.2f} {am.id}"
+            text = gen_text(classes_dict, am, ae.confidence)
+            # text = f"{am.class_id} {ae.confidence:.2f} {am.id}"
             add_ano_to_image(cv2_image, am, text, dh, dw, color_red)
         elif am is None:
-            text = f"{ah.class_id} {ah.id}"
+            # text = f"{ah.class_id} {ah.id}"
+            text = gen_text(classes_dict, ah, None)
             add_ano_to_image(cv2_image, ah, text, dh, dw, color_yellow)
         else:
-            text = f"{ah.class_id} {ah.id}"
+            text = gen_text(classes_dict, ah, None)
             add_ano_to_image(cv2_image, ah, text, dh, dw, color_yellow)
-            text = f"{am.class_id} {ae.confidence:.2f} {am.id}"
+            text = gen_text(classes_dict, am, ae.confidence)
             add_ano_to_image(cv2_image, am, text, dh, dw, color_red)
             skip.add(ah.id)
 
     for a in correct:
         if a.id in skip:
             continue
-        text = f"{a.class_id} {a.id}"
+        text = gen_text(classes_dict, a, None)
         add_ano_to_image(cv2_image, a, text, dh, dw, color_green)
 
     params = (cv2.IMWRITE_PNG_COMPRESSION, 0)
@@ -156,7 +124,8 @@ def get_dict_from_ano(ano: Annotation, ae: AnnotationError):
         "height": ano.height,
         "class_id": ano.class_id,
         "model_id": ae.model_id,
-        "training_amount": ae.training_amount,
+        "image_count": ae.image_count,
+        "human_annotation_count": ae.human_annotation_count,
         "confidence": ae.confidence,
         "error_id": ae.id
     }

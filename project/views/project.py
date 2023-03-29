@@ -10,7 +10,7 @@ from marshmallow import ValidationError
 from werkzeug.datastructures import MultiDict
 from werkzeug.utils import secure_filename
 
-from project.services.file_upload_service import upload_files
+from project.services.file_upload_service import upload_files, upload_class_file
 from project.models.annotation import Annotation
 from project.models.image import Image
 from project.services.project_service import create_project, get_all_projects, get_project_info, \
@@ -160,6 +160,16 @@ def upload(project_id: int):
 
     return jsonify(
         {'message': f'Uploaded {passed} images and {annotations} annotations. There were {failed} failed images'}), 201
+
+
+@REQUEST_API.route('/<int:project_id>/upload_classes', methods=["POST"])
+def upload_classes(project_id: int):
+    file = request.files.get("file")
+    if file is None:
+        raise ValidationError({"error": "Cant read this file"})
+    upload_class_file(file, project_id)
+
+    return jsonify({"message": "Uploaded classes"})
 
 
 @REQUEST_API.route('/<int:project_id>', methods=['GET'])
