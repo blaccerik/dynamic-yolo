@@ -16,6 +16,7 @@ Tutorial:   https://github.com/ultralytics/yolov5/wiki/Train-Custom-Data
 """
 
 import argparse
+import io
 import math
 import os
 import random
@@ -59,7 +60,6 @@ from utils.metrics import fitness
 from utils.plots import plot_evolve
 from utils.torch_utils import (EarlyStopping, ModelEMA, de_parallel, select_device, smart_DDP, smart_optimizer,
                                smart_resume, torch_distributed_zero_first)
-from project.services.training_service import add_results_to_db
 
 LOCAL_RANK = int(os.getenv('LOCAL_RANK', -1))  # https://pytorch.org/docs/stable/elastic/run.html
 RANK = int(os.getenv('RANK', -1))
@@ -67,16 +67,16 @@ WORLD_SIZE = int(os.getenv('WORLD_SIZE', 1))
 GIT_INFO = check_git_info()
 
 
-def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictionary
+def train(hyp, opt, device, callbacks, binary_weights=None, yaml_dict=None, sql_stream=None):  # hyp is path/to/hyp.yaml or hyp dictionary
     save_dir, epochs, batch_size, weights, single_cls, evolve, data, cfg, resume, noval, nosave, workers, freeze = \
         Path(opt.save_dir), opt.epochs, opt.batch_size, opt.weights, opt.single_cls, opt.evolve, opt.data, opt.cfg, \
         opt.resume, opt.noval, opt.nosave, opt.workers, opt.freeze
     callbacks.run('on_pretrain_routine_start')
-
     # Directories
-    w = save_dir / 'weights'  # weights dir
-    (w.parent if evolve else w).mkdir(parents=True, exist_ok=True)  # make dir
-    last, best = w / 'last.pt', w / 'best.pt'
+    if sql_stream is None:
+        w = save_dir / 'weights'  # weights dir
+        (w.parent if evolve else w).mkdir(parents=True, exist_ok=True)  # make dir
+        last, best = w / 'last.pt', w / 'best.pt'
 
     # Hyperparameters
     if isinstance(hyp, str):
@@ -84,26 +84,25 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             hyp = yaml.safe_load(f)  # load hyps dict
     LOGGER.info(colorstr('hyperparameters: ') + ', '.join(f'{k}={v}' for k, v in hyp.items()))
     opt.hyp = hyp.copy()  # for saving hyps to checkpoints
-
     # Save run settings
-    if not evolve:
-        yaml_save(save_dir / 'hyp.yaml', hyp)
-        yaml_save(save_dir / 'opt.yaml', vars(opt))
-
+    if sql_stream is None:
+        if not evolve:
+            yaml_save(save_dir / 'hyp.yaml', hyp)
+            yaml_save(save_dir / 'opt.yaml', vars(opt))
     # Loggers
     data_dict = None
     if RANK in {-1, 0}:
-        loggers = Loggers(save_dir, weights, opt, hyp, LOGGER)  # loggers instance
+        if sql_stream is None:
+            loggers = Loggers(save_dir, weights, opt, hyp, LOGGER)  # loggers instance
 
-        # Register actions
-        for k in methods(loggers):
-            callbacks.register_action(k, callback=getattr(loggers, k))
+            # Register actions
+            for k in methods(loggers):
+                callbacks.register_action(k, callback=getattr(loggers, k))
 
-        # Process custom dataset artifact link
-        data_dict = loggers.remote_dataset
-        if resume:  # If resuming runs from remote artifact
-            weights, epochs, hyp, batch_size = opt.weights, opt.epochs, opt.hyp, opt.batch_size
-
+            # Process custom dataset artifact link
+            data_dict = loggers.remote_dataset
+            if resume:  # If resuming runs from remote artifact
+                weights, epochs, hyp, batch_size = opt.weights, opt.epochs, opt.hyp, opt.batch_size
     # Config
     plots = not evolve and not opt.noplots  # create plots
     cuda = device.type != 'cpu'
@@ -114,14 +113,17 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     nc = 1 if single_cls else int(data_dict['nc'])  # number of classes
     names = {0: 'item'} if single_cls and len(data_dict['names']) != 1 else data_dict['names']  # class names
     is_coco = isinstance(val_path, str) and val_path.endswith('coco/val2017.txt')  # COCO dataset
-
     # Model
     check_suffix(weights, '.pt')  # check weights
     pretrained = weights.endswith('.pt')
     if pretrained:
         with torch_distributed_zero_first(LOCAL_RANK):
             weights = attempt_download(weights)  # download if not found locally
-        ckpt = torch.load(weights, map_location='cpu')  # load checkpoint to CPU to avoid CUDA memory leak
+        if binary_weights is None:
+            ckpt = torch.load(weights, map_location='cpu')  # load checkpoint to CPU to avoid CUDA memory leak
+        else:
+            ckpt = torch.load(io.BytesIO(binary_weights), map_location='cpu')
+
         model = Model(cfg or ckpt['model'].yaml, ch=3, nc=nc, anchors=hyp.get('anchors')).to(device)  # create
         exclude = ['anchor'] if (cfg or hyp.get('anchors')) and not resume else []  # exclude keys
         csd = ckpt['model'].float().state_dict()  # checkpoint state_dict as FP32
@@ -129,9 +131,11 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
         model.load_state_dict(csd, strict=False)  # load
         LOGGER.info(f'Transferred {len(csd)}/{len(model.state_dict())} items from {weights}')  # report
     else:
-        model = Model(cfg, ch=3, nc=nc, anchors=hyp.get('anchors')).to(device)  # create
+        if yaml_dict is None:
+            model = Model(cfg, ch=3, nc=nc, anchors=hyp.get('anchors')).to(device)  # create
+        else:
+            model = Model(yaml_dict, ch=3, nc=nc, anchors=hyp.get('anchors')).to(device)  # create
     amp = check_amp(model)  # check AMP
-
     # Freeze
     freeze = [f'model.{x}.' for x in (freeze if len(freeze) > 1 else range(freeze[0]))]  # layers to freeze
     for k, v in model.named_parameters():
@@ -149,7 +153,6 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     if RANK == -1 and batch_size == -1:  # single-GPU only, estimate best batch size
         batch_size = check_train_batch_size(model, imgsz, amp)
         loggers.on_params_update({"batch_size": batch_size})
-
     # Optimizer
     nbs = 64  # nominal batch size
     accumulate = max(round(nbs / batch_size), 1)  # accumulate loss before optimizing
@@ -162,7 +165,6 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     else:
         lf = lambda x: (1 - x / epochs) * (1.0 - hyp['lrf']) + hyp['lrf']  # linear
     scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=lf)  # plot_lr_scheduler(optimizer, scheduler, epochs)
-
     # EMA
     ema = ModelEMA(model) if RANK in {-1, 0} else None
 
@@ -178,7 +180,6 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
         LOGGER.warning('WARNING ⚠️ DP not recommended, use torch.distributed.run for best DDP Multi-GPU results.\n'
                        'See Multi-GPU Tutorial at https://github.com/ultralytics/yolov5/issues/475 to get started.')
         model = torch.nn.DataParallel(model)
-
     # SyncBatchNorm
     if opt.sync_bn and cuda and RANK != -1:
         model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model).to(device)
@@ -226,7 +227,6 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             if not opt.noautoanchor:
                 check_anchors(dataset, model=model, thr=hyp['anchor_t'], imgsz=imgsz)  # run AutoAnchor
             model.half().float()  # pre-reduce anchor precision
-
         callbacks.run('on_pretrain_routine_end', labels, names)
 
     # DDP mode
@@ -246,8 +246,6 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
 
     # Start training
     t0 = time.time()
-    db_model_id = opt.db_model_id
-    db_train_subset_id = opt.db_train_subset_id
     nb = len(train_loader)  # number of batches
     nw = max(round(hyp['warmup_epochs'] * nb), 100)  # number of warmup iterations, max(3 epochs, 100 iterations)
     # nw = min(nw, (epochs - start_epoch) / 2 * nb)  # limit warmup to < 1/2 of training
@@ -264,6 +262,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                 f"Logging results to {colorstr('bold', save_dir)}\n"
                 f'Starting training for {epochs} epochs...')
     for epoch in range(start_epoch, epochs):  # epoch ------------------------------------------------------------------
+
         callbacks.run('on_train_epoch_start')
         model.train()
 
@@ -281,6 +280,8 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
         if RANK != -1:
             train_loader.sampler.set_epoch(epoch)
         pbar = enumerate(train_loader)
+
+
         LOGGER.info(('\n' + '%11s' * 7) % ('Epoch', 'GPU_mem', 'box_loss', 'obj_loss', 'cls_loss', 'Instances', 'Size'))
         if RANK in {-1, 0}:
             pbar = tqdm(pbar, total=nb, bar_format=TQDM_BAR_FORMAT)  # progress bar
@@ -342,7 +343,6 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                 if callbacks.stop_training:
                     return
             # end batch ------------------------------------------------------------------------------------------------
-
         # Scheduler
         lr = [x['lr'] for x in optimizer.param_groups]  # for loggers
         scheduler.step()
@@ -364,7 +364,8 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                                                 plots=False,
                                                 callbacks=callbacks,
                                                 compute_loss=compute_loss)
-                add_results_to_db(results, maps, db_model_id, db_train_subset_id, epoch=epoch)
+                if sql_stream:
+                    sql_stream.add_results_to_db(results, maps, "val", epoch)
 
 
             # Update best mAP
@@ -373,8 +374,8 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             if fi > best_fitness:
                 best_fitness = fi
             log_vals = list(mloss) + list(results) + lr
-            callbacks.run('on_fit_epoch_end', log_vals, epoch, best_fitness, fi)
-
+            if not sql_stream:
+                callbacks.run('on_fit_epoch_end', log_vals, epoch, best_fitness, fi)
             # Save model
             if (not nosave) or (final_epoch and not evolve):  # if save
                 ckpt = {
@@ -387,15 +388,19 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                     'opt': vars(opt),
                     'git': GIT_INFO,  # {remote, branch, commit} if a git repo
                     'date': datetime.now().isoformat()}
-
-                # Save last, best and delete
-                torch.save(ckpt, last)
-                if best_fitness == fi:
-                    torch.save(ckpt, best)
-                if opt.save_period > 0 and epoch % opt.save_period == 0:
-                    torch.save(ckpt, w / f'epoch{epoch}.pt')
+                if sql_stream:
+                    if best_fitness == fi:
+                        sql_stream.save_best(ckpt)
+                else:
+                    # Save last, best and delete
+                    torch.save(ckpt, last)
+                    if best_fitness == fi:
+                        torch.save(ckpt, best)
+                    if opt.save_period > 0 and epoch % opt.save_period == 0:
+                        torch.save(ckpt, w / f'epoch{epoch}.pt')
                 del ckpt
-                callbacks.run('on_model_save', last, epoch, final_epoch, best_fitness, fi)
+                if sql_stream is None:
+                    callbacks.run('on_model_save', last, epoch, final_epoch, best_fitness, fi)
 
         # EarlyStopping
         if RANK != -1:  # if DDP training
@@ -409,30 +414,31 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
         # end epoch ----------------------------------------------------------------------------------------------------
     # end training -----------------------------------------------------------------------------------------------------
     if RANK in {-1, 0}:
-        LOGGER.info(f'\n{epoch - start_epoch + 1} epochs completed in {(time.time() - t0) / 3600:.3f} hours.')
-        for f in last, best:
-            if f.exists():
-                strip_optimizer(f)  # strip optimizers
-                if f is best:
-                    LOGGER.info(f'\nValidating {f}...')
-                    results, _, _ = validate.run(
-                        data_dict,
-                        batch_size=batch_size // WORLD_SIZE * 2,
-                        imgsz=imgsz,
-                        model=attempt_load(f, device).half(),
-                        iou_thres=0.65 if is_coco else 0.60,  # best pycocotools at iou 0.65
-                        single_cls=single_cls,
-                        dataloader=val_loader,
-                        save_dir=save_dir,
-                        save_json=is_coco,
-                        verbose=True,
-                        plots=plots,
-                        callbacks=callbacks,
-                        compute_loss=compute_loss)  # val best model with plots
-                    if is_coco:
-                        callbacks.run('on_fit_epoch_end', list(mloss) + list(results) + lr, epoch, best_fitness, fi)
+        if sql_stream is None:
+            LOGGER.info(f'\n{epoch - start_epoch + 1} epochs completed in {(time.time() - t0) / 3600:.3f} hours.')
+            for f in last, best:
+                if f.exists():
+                    strip_optimizer(f)  # strip optimizers
+                    if f is best:
+                        LOGGER.info(f'\nValidating {f}...')
+                        results, _, _ = validate.run(
+                            data_dict,
+                            batch_size=batch_size // WORLD_SIZE * 2,
+                            imgsz=imgsz,
+                            model=attempt_load(f, device).half(),
+                            iou_thres=0.65 if is_coco else 0.60,  # best pycocotools at iou 0.65
+                            single_cls=single_cls,
+                            dataloader=val_loader,
+                            save_dir=save_dir,
+                            save_json=is_coco,
+                            verbose=True,
+                            plots=plots,
+                            callbacks=callbacks,
+                            compute_loss=compute_loss)  # val best model with plots
+                        if is_coco:
+                            callbacks.run('on_fit_epoch_end', list(mloss) + list(results) + lr, epoch, best_fitness, fi)
 
-        callbacks.run('on_train_end', last, best, epoch, results)
+            callbacks.run('on_train_end', last, best, epoch, results)
 
     torch.cuda.empty_cache()
     return results
@@ -484,13 +490,12 @@ def parse_opt(known=False):
     return parser.parse_known_args()[0] if known else parser.parse_args()
 
 
-def main(opt, callbacks=Callbacks()):
+def main(opt, callbacks=Callbacks(), binary_weights=None, yaml_dict=None, sql_stream=None):
     # Checks
     if RANK in {-1, 0}:
         print_args(vars(opt))
         check_git_status()
         check_requirements()
-
     # Resume (from specified or most recent last.pt)
     if opt.resume and not check_comet_resume(opt) and not opt.evolve:
         last = Path(check_file(opt.resume) if isinstance(opt.resume, str) else get_latest_run())
@@ -532,7 +537,7 @@ def main(opt, callbacks=Callbacks()):
 
     # Train
     if not opt.evolve:
-        train(opt.hyp, opt, device, callbacks)
+        train(opt.hyp, opt, device, callbacks, binary_weights=binary_weights, yaml_dict=yaml_dict, sql_stream=sql_stream)
 
     # Evolve hyperparameters (optional)
     else:

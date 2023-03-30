@@ -362,6 +362,11 @@ def smart_resume(ckpt, optimizer, ema=None, weights='yolov5s.pt', epochs=300, re
     # Resume training from a partially trained checkpoint
     best_fitness = 0.0
     start_epoch = ckpt['epoch'] + 1
+    print("torch-utils ")
+    print(ckpt['optimizer'] is not None)
+    print(ema and ckpt.get('ema'))
+    print(resume)
+    print(epochs < start_epoch)
     if ckpt['optimizer'] is not None:
         optimizer.load_state_dict(ckpt['optimizer'])  # optimizer
         best_fitness = ckpt['best_fitness']

@@ -36,16 +36,17 @@ import torch
 import torchvision
 import yaml
 
-from utils import TryExcept, emojis
-from utils.downloads import gsutil_getsize
-from utils.metrics import box_iou, fitness
+from yolov5.utils import TryExcept, emojis
+from yolov5.utils.downloads import gsutil_getsize
+from yolov5.utils.metrics import box_iou, fitness
 
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[1]  # YOLOv5 root directory
 RANK = int(os.getenv('RANK', -1))
 
 # Settings
-NUM_THREADS = min(8, max(1, os.cpu_count() - 1))  # number of YOLOv5 multiprocessing threads
+# NUM_THREADS = min(8, max(1, os.cpu_count() - 1))  # number of YOLOv5 multiprocessing threads
+NUM_THREADS = 4
 DATASETS_DIR = Path(os.getenv('YOLOv5_DATASETS_DIR', ROOT.parent / 'datasets'))  # global datasets directory
 AUTOINSTALL = str(os.getenv('YOLOv5_AUTOINSTALL', True)).lower() == 'true'  # global auto-install mode
 VERBOSE = str(os.getenv('YOLOv5_VERBOSE', True)).lower() == 'true'  # global verbose mode
@@ -510,8 +511,8 @@ def check_dataset(data, autodownload=True):
         data = yaml_load(data)  # dictionary
 
     # Checks
-    for k in 'train', 'val', 'names':
-        assert k in data, emojis(f"data.yaml '{k}:' field missing ❌")
+    # for k in 'train', 'val', 'names':
+    #     assert k in data, emojis(f"data.yaml '{k}:' field missing ❌")
     if isinstance(data['names'], (list, tuple)):  # old array format
         data['names'] = dict(enumerate(data['names']))  # convert to dict
     assert all(isinstance(k, int) for k in data['names'].keys()), 'data.yaml names keys must be integers, i.e. 2: car'

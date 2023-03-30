@@ -124,6 +124,7 @@ def run(
         plots=False,
         callbacks=Callbacks(),
         compute_loss=None,
+        binary_weights=None
 ):
     # Initialize/load model and set device
     training = model is not None
@@ -135,11 +136,12 @@ def run(
         device = select_device(device, batch_size=batch_size)
 
         # Directories
-        save_dir = increment_path(Path(project) / name, exist_ok=exist_ok)  # increment run
-        (save_dir / 'labels' if save_txt else save_dir).mkdir(parents=True, exist_ok=True)  # make dir
+        if binary_weights is None:
+            save_dir = increment_path(Path(project) / name, exist_ok=exist_ok)  # increment run
+            (save_dir / 'labels' if save_txt else save_dir).mkdir(parents=True, exist_ok=True)  # make dir
 
         # Load model
-        model = DetectMultiBackend(weights, device=device, dnn=dnn, data=data, fp16=half)
+        model = DetectMultiBackend(weights, device=device, dnn=dnn, data=data, fp16=half, binary_weights=binary_weights)
         stride, pt, jit, engine = model.stride, model.pt, model.jit, model.engine
         imgsz = check_img_size(imgsz, s=stride)  # check image size
         half = model.fp16  # FP16 supported on limited backends with CUDA

@@ -17,7 +17,7 @@ class AnnotationSchema(Schema):
             project_id = data['project_id']
             project_settings = ProjectSettings.query.filter_by(id=project_id).first()
             max_class_nr = project_settings.max_class_nr
-            if data["class_id"] <= 0 or data["class_id"] > max_class_nr - 1:
+            if data["class_id"] < 0 or data["class_id"] > max_class_nr - 1:
                 raise ValidationError(
                     f"Class ID must be between 0 and {max_class_nr - 1}",
                     "class_id"

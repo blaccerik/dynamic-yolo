@@ -1,11 +1,8 @@
-from select import select
-
-from sqlalchemy import VARCHAR, Column, BigInteger, ForeignKey, Integer, Float, text
-from sqlalchemy.orm import relationship
+from sqlalchemy import VARCHAR, Column, BigInteger, ForeignKey, Integer, Float, Boolean
 
 from project import db
-from project.models.project import Project
 from project.models.initial_model import InitialModel
+from project.models.project import Project
 
 
 def get_default_name_id():
@@ -19,13 +16,38 @@ class ProjectSettings(db.Model):
     batch_size = Column(Integer, nullable=False, default=8)
     img_size = Column(Integer, nullable=False, default=640)
     initial_model_id = Column(Integer, ForeignKey("initial_model.id"), nullable=False, default=get_default_name_id)
-    confidence_threshold = Column(Float, nullable=False, default=0.95) # how confident model needs to be to skip image
-    train_test_ratio = Column(Float, nullable=False, default=0.75)
-    minimal_map_50_threshold = Column(Float, nullable=False, default=0)
+
+    # data splits
+    train_ratio = Column(Integer, nullable=False, default=50)
+    val_ratio = Column(Integer, nullable=False, default=25)
+
+    # error detection
+    check_size_difference_threshold = Column(Float, nullable=False, default=0.05)
+    check_center_difference_threshold = Column(Float, nullable=False, default=0.1)
+    check_error_amount_threshold = Column(Float, nullable=False, default=0.1)
+
+    maximum_auto_train_number = Column(Integer, nullable=False, default=3)
 
     # min confidence for model to read image section as detection
     min_confidence_threshold = Column(Float, nullable=False, default=0.25)
     min_iou_threshold = Column(Float, nullable=False, default=0.45)
+
+    always_test = Column(Boolean, nullable=False, default=False)
+    always_check = Column(Boolean, nullable=False, default=False)
+
+    # train speed
+    freeze_backbone = Column(Boolean, nullable=False, default=False)
+    use_ram = Column(Boolean, nullable=False, default=False)
+
+    # gpu stats
+    devices = Column(VARCHAR(128), nullable=False, default="0")
+
+    # auto train
+    minimal_map_50_threshold = Column(Float, nullable=False, default=0)
+    minimal_map_50_95_threshold = Column(Float, nullable=False, default=0)
+    minimal_precision_threshold = Column(Float, nullable=False, default=0)
+    minimal_recall_threshold = Column(Float, nullable=False, default=0)
+
 
 
 

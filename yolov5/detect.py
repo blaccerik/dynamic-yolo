@@ -30,9 +30,13 @@ import argparse
 import os
 import platform
 import sys
+import time
 from pathlib import Path
 
 import torch
+
+from main import SqlStream
+from main import Session
 
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[0]  # YOLOv5 root directory
@@ -77,6 +81,8 @@ def run(
         half=False,  # use FP16 half-precision inference
         dnn=False,  # use OpenCV DNN for ONNX inference
         vid_stride=1,  # video frame-rate stride
+        binary_weights=None,
+        sql_stream: SqlStream = None
 ):
     source = str(source)
     save_img = not nosave and not source.endswith('.txt')  # save inference images
@@ -88,12 +94,12 @@ def run(
         source = check_file(source)  # download
 
     # Directories
-    save_dir = increment_path(Path(project) / name, exist_ok=exist_ok)  # increment run
-    (save_dir / 'labels' if save_txt else save_dir).mkdir(parents=True, exist_ok=True)  # make dir
-
+    if sql_stream is None:
+        save_dir = increment_path(Path(project) / name, exist_ok=exist_ok)  # increment run
+        (save_dir / 'labels' if save_txt else save_dir).mkdir(parents=True, exist_ok=True)  # make dir
     # Load model
     device = select_device(device)
-    model = DetectMultiBackend(weights, device=device, dnn=dnn, data=data, fp16=half)
+    model = DetectMultiBackend(weights, device=device, dnn=dnn, data=data, fp16=half, binary_weights=binary_weights)
     stride, names, pt = model.stride, model.names, model.pt
     imgsz = check_img_size(imgsz, s=stride)  # check image size
 
@@ -105,113 +111,139 @@ def run(
         bs = len(dataset)
     elif screenshot:
         dataset = LoadScreenshots(source, img_size=imgsz, stride=stride, auto=pt)
-    else:
+    elif sql_stream is None:
         dataset = LoadImages(source, img_size=imgsz, stride=stride, auto=pt, vid_stride=vid_stride)
+    else:
+        dataset = None
     vid_path, vid_writer = [None] * bs, [None] * bs
 
     # Run inference
     model.warmup(imgsz=(1 if pt or model.triton else bs, 3, *imgsz))  # warmup
     seen, windows, dt = 0, [], (Profile(), Profile(), Profile())
-    for path, im, im0s, vid_cap, s in dataset:
-        with dt[0]:
-            im = torch.from_numpy(im).to(model.device)
-            im = im.half() if model.fp16 else im.float()  # uint8 to fp16/32
-            im /= 255  # 0 - 255 to 0.0 - 1.0
-            if len(im.shape) == 3:
-                im = im[None]  # expand for batch dim
 
-        # Inference
-        with dt[1]:
-            visualize = increment_path(save_dir / Path(path).stem, mkdir=True) if visualize else False
-            pred = model(im, augment=augment, visualize=visualize)
+    if sql_stream is not None:
+        with Session() as session:
+            for im, im0, image_id in sql_stream.get_all_train_images(session):
+                with dt[0]:
+                    im = torch.from_numpy(im).to(model.device)
+                    im = im.half() if model.fp16 else im.float()  # uint8 to fp16/32
+                    im /= 255  # 0 - 255 to 0.0 - 1.0
+                    if len(im.shape) == 3:
+                        im = im[None]  # expand for batch dim
+                # Inference
+                with dt[1]:
+                    pred = model(im, augment=augment, visualize=False)
+                # NMS
+                with dt[2]:
+                    pred = non_max_suppression(pred, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)
+                # preds
+                sql_stream.normalize_preds(pred, im0, im, image_id, session)
+    else:
+        for path, im, im0s, vid_cap, s in dataset:
+            with dt[0]:
+                im = torch.from_numpy(im).to(model.device)
+                im = im.half() if model.fp16 else im.float()  # uint8 to fp16/32
+                im /= 255  # 0 - 255 to 0.0 - 1.0
+                if len(im.shape) == 3:
+                    im = im[None]  # expand for batch dim
 
-        # NMS
-        with dt[2]:
-            pred = non_max_suppression(pred, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)
+            # Inference
+            with dt[1]:
+                visualize = increment_path(save_dir / Path(path).stem, mkdir=True) if visualize else False
+                pred = model(im, augment=augment, visualize=visualize)
 
-        # Second-stage classifier (optional)
-        # pred = utils.general.apply_classifier(pred, classifier_model, im, im0s)
+            # NMS
+            with dt[2]:
+                pred = non_max_suppression(pred, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)
 
-        # Process predictions
-        for i, det in enumerate(pred):  # per image
-            seen += 1
-            if webcam:  # batch_size >= 1
-                p, im0, frame = path[i], im0s[i].copy(), dataset.count
-                s += f'{i}: '
-            else:
-                p, im0, frame = path, im0s.copy(), getattr(dataset, 'frame', 0)
+            # Second-stage classifier (optional)
+            # pred = utils.general.apply_classifier(pred, classifier_model, im, im0s)
 
-            p = Path(p)  # to Path
-            save_path = str(save_dir / p.name)  # im.jpg
-            txt_path = str(save_dir / 'labels' / p.stem) + ('' if dataset.mode == 'image' else f'_{frame}')  # im.txt
-            s += '%gx%g ' % im.shape[2:]  # print string
-            gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
-            imc = im0.copy() if save_crop else im0  # for save_crop
-            annotator = Annotator(im0, line_width=line_thickness, example=str(names))
-            if len(det):
-                # Rescale boxes from img_size to im0 size
-                det[:, :4] = scale_boxes(im.shape[2:], det[:, :4], im0.shape).round()
+            # Process predictions
+            for i, det in enumerate(pred):  # per image
 
-                # Print results
-                for c in det[:, 5].unique():
-                    n = (det[:, 5] == c).sum()  # detections per class
-                    s += f"{n} {names[int(c)]}{'s' * (n > 1)}, "  # add to string
+                seen += 1
+                if webcam:  # batch_size >= 1
+                    p, im0, frame = path[i], im0s[i].copy(), dataset.count
+                    s += f'{i}: '
+                else:
+                    p, im0, frame = path, im0s.copy(), getattr(dataset, 'frame', 0)
 
-                # Write results
-                for *xyxy, conf, cls in reversed(det):
-                    if save_txt:  # Write to file
-                        xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
-                        line = (cls, *xywh, conf) if save_conf else (cls, *xywh)  # label format
-                        with open(f'{txt_path}.txt', 'a') as f:
-                            f.write(('%g ' * len(line)).rstrip() % line + '\n')
+                p = Path(p)  # to Path
+                save_path = str(save_dir / p.name)  # im.jpg
+                txt_path = str(save_dir / 'labels' / p.stem) + ('' if dataset.mode == 'image' else f'_{frame}')  # im.txt
+                s += '%gx%g ' % im.shape[2:]  # print string
+                gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
+                imc = im0.copy() if save_crop else im0  # for save_crop
+                annotator = Annotator(im0, line_width=line_thickness, example=str(names))
 
-                    if save_img or save_crop or view_img:  # Add bbox to image
-                        c = int(cls)  # integer class
-                        label = None if hide_labels else (names[c] if hide_conf else f'{names[c]} {conf:.2f}')
-                        annotator.box_label(xyxy, label, color=colors(c, True))
-                    if save_crop:
-                        save_one_box(xyxy, imc, file=save_dir / 'crops' / names[c] / f'{p.stem}.jpg', BGR=True)
+                if len(det):
+                    # Rescale boxes from img_size to im0 size
+                    det[:, :4] = scale_boxes(im.shape[2:], det[:, :4], im0.shape).round()
 
-            # Stream results
-            im0 = annotator.result()
-            if view_img:
-                if platform.system() == 'Linux' and p not in windows:
-                    windows.append(p)
-                    cv2.namedWindow(str(p), cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO)  # allow window resize (Linux)
-                    cv2.resizeWindow(str(p), im0.shape[1], im0.shape[0])
-                cv2.imshow(str(p), im0)
-                cv2.waitKey(1)  # 1 millisecond
+                    # Print results
+                    for c in det[:, 5].unique():
+                        n = (det[:, 5] == c).sum()  # detections per class
+                        s += f"{n} {names[int(c)]}{'s' * (n > 1)}, "  # add to string
 
-            # Save results (image with detections)
-            if save_img:
-                if dataset.mode == 'image':
-                    cv2.imwrite(save_path, im0)
-                else:  # 'video' or 'stream'
-                    if vid_path[i] != save_path:  # new video
-                        vid_path[i] = save_path
-                        if isinstance(vid_writer[i], cv2.VideoWriter):
-                            vid_writer[i].release()  # release previous video writer
-                        if vid_cap:  # video
-                            fps = vid_cap.get(cv2.CAP_PROP_FPS)
-                            w = int(vid_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-                            h = int(vid_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-                        else:  # stream
-                            fps, w, h = 30, im0.shape[1], im0.shape[0]
-                        save_path = str(Path(save_path).with_suffix('.mp4'))  # force *.mp4 suffix on results videos
-                        vid_writer[i] = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
-                    vid_writer[i].write(im0)
+                    # Write results
+                    for *xyxy, conf, cls in reversed(det):
+                        if save_txt:  # Write to file
+                            xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
+                            line = (cls, *xywh, conf) if save_conf else (cls, *xywh)  # label format
 
-        # Print time (inference-only)
-        LOGGER.info(f"{s}{'' if len(det) else '(no detections), '}{dt[1].dt * 1E3:.1f}ms")
+                            print("real", ('%g ' * len(line)).rstrip() % line)
 
-    # Print results
-    t = tuple(x.t / seen * 1E3 for x in dt)  # speeds per image
-    LOGGER.info(f'Speed: %.1fms pre-process, %.1fms inference, %.1fms NMS per image at shape {(1, 3, *imgsz)}' % t)
-    if save_txt or save_img:
-        s = f"\n{len(list(save_dir.glob('labels/*.txt')))} labels saved to {save_dir / 'labels'}" if save_txt else ''
-        LOGGER.info(f"Results saved to {colorstr('bold', save_dir)}{s}")
-    if update:
-        strip_optimizer(weights[0])  # update model (to fix SourceChangeWarning)
+                            with open(f'{txt_path}.txt', 'a') as f:
+                                f.write(('%g ' * len(line)).rstrip() % line + '\n')
+
+                        if save_img or save_crop or view_img:  # Add bbox to image
+                            c = int(cls)  # integer class
+                            label = None if hide_labels else (names[c] if hide_conf else f'{names[c]} {conf:.2f}')
+                            annotator.box_label(xyxy, label, color=colors(c, True))
+                        if save_crop:
+                            save_one_box(xyxy, imc, file=save_dir / 'crops' / names[c] / f'{p.stem}.jpg', BGR=True)
+
+                # Stream results
+                im0 = annotator.result()
+                if view_img:
+                    if platform.system() == 'Linux' and p not in windows:
+                        windows.append(p)
+                        cv2.namedWindow(str(p), cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO)  # allow window resize (Linux)
+                        cv2.resizeWindow(str(p), im0.shape[1], im0.shape[0])
+                    cv2.imshow(str(p), im0)
+                    cv2.waitKey(1)  # 1 millisecond
+
+                # Save results (image with detections)
+                if save_img:
+                    if dataset.mode == 'image':
+                        cv2.imwrite(save_path, im0)
+                    else:  # 'video' or 'stream'
+                        if vid_path[i] != save_path:  # new video
+                            vid_path[i] = save_path
+                            if isinstance(vid_writer[i], cv2.VideoWriter):
+                                vid_writer[i].release()  # release previous video writer
+                            if vid_cap:  # video
+                                fps = vid_cap.get(cv2.CAP_PROP_FPS)
+                                w = int(vid_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+                                h = int(vid_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                            else:  # stream
+                                fps, w, h = 30, im0.shape[1], im0.shape[0]
+                            save_path = str(Path(save_path).with_suffix('.mp4'))  # force *.mp4 suffix on results videos
+                            vid_writer[i] = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
+                        vid_writer[i].write(im0)
+
+            # Print time (inference-only)
+            LOGGER.info(f"{s}{'' if len(det) else '(no detections), '}{dt[1].dt * 1E3:.1f}ms")
+
+        # Print results
+        t = tuple(x.t / seen * 1E3 for x in dt)  # speeds per image
+        LOGGER.info(f'Speed: %.1fms pre-process, %.1fms inference, %.1fms NMS per image at shape {(1, 3, *imgsz)}' % t)
+        if save_txt or save_img:
+            s = f"\n{len(list(save_dir.glob('labels/*.txt')))} labels saved to {save_dir / 'labels'}" if save_txt else ''
+            LOGGER.info(f"Results saved to {colorstr('bold', save_dir)}{s}")
+        if update:
+            strip_optimizer(weights[0])  # update model (to fix SourceChangeWarning)
 
 
 def parse_opt(known=False):

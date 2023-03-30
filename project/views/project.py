@@ -1,17 +1,20 @@
+import cgi
 import io
+import re
 import tarfile
 from io import BytesIO
 
-import PIL
+import PIL.Image
 from flask import Blueprint, request, jsonify
 from marshmallow import ValidationError
+from werkzeug.datastructures import MultiDict
 from werkzeug.utils import secure_filename
 
-from project.services.file_upload_service import upload_files
+from project.services.file_upload_service import upload_files, upload_class_file
 from project.models.annotation import Annotation
 from project.models.image import Image
 from project.services.project_service import create_project, get_all_projects, get_project_info, \
-    change_settings, get_settings, get_images, get_models, retrieve_annotations
+    change_settings, get_settings, get_images, get_models, retrieve_annotations, retrieve_project_errors
 from project.schemas.project import Project
 from project.schemas.upload import Upload
 from project.schemas.projectsettings import ProjectSettingsSchema
@@ -37,6 +40,9 @@ def _text_to_annotations(content, filename):
     _list = []
     name = filename.split(".")[0]
     text = str(content, "utf-8")
+    if text == "":
+        return [(None, name)]
+
     for line in text.splitlines():
         try:
             nr, x, y, w, h = line.strip().split(" ")
@@ -58,6 +64,7 @@ def _text_to_annotations(content, filename):
                 raise ValidationError({"error": f"File: {name}.txt did not yolo format"})
             _list.append((Annotation(x_center=x, y_center=y, width=w, height=h, class_id=nr), name))
         except Exception as e:
+            print(e)
             raise ValidationError({"error": f"Can't read file: {name}.txt"})
             # return jsonify({'error': f"Can't read file: {name}.txt"}), 400
     return _list
@@ -66,28 +73,11 @@ def _text_to_annotations(content, filename):
 def _bytes_to_image(content, filename):
     try:
         img = PIL.Image.open(io.BytesIO(content))
-    except Exception:
+    except Exception as e:
+        print(e)
         raise ValidationError({"error": f"Can't read file: {filename}"})
     name = filename.split(".")[0]
     return Image(image=content, width=img.size[0], height=img.size[1]), name
-
-
-def _check_files(files):
-    final_files = []
-    for file in files:
-        filename = secure_filename(file.filename)
-        content = file.stream.read()
-        file.stream.close()
-        if filename.endswith(".txt"):
-            annotations = _text_to_annotations(content, filename)
-            final_files.extend(annotations)
-        elif filename.endswith(".png") or filename.endswith(".jpg"):
-            final_files.append(_bytes_to_image(content, filename))
-        elif filename.endswith(".tar.gz"):
-            final_files.extend(_check_zip_file(content))
-        else:
-            raise ValidationError({'error': f'not supported parsing {filename}'})
-    return final_files
 
 
 def _check_zip_file(content):
@@ -108,6 +98,24 @@ def _check_zip_file(content):
         else:
             raise ValidationError({'error': f'not supported parsing {filename}'})
     return files
+
+
+def _check_files(files):
+    final_files = []
+    for file in files:
+        filename = secure_filename(file.filename)
+        content = file.stream.read()
+        file.stream.close()
+        if filename.endswith(".txt"):
+            annotations = _text_to_annotations(content, filename)
+            final_files.extend(annotations)
+        elif filename.endswith(".png") or filename.endswith(".jpg"):
+            final_files.append(_bytes_to_image(content, filename))
+        elif filename.endswith(".tar.gz"):
+            final_files.extend(_check_zip_file(content))
+        else:
+            raise ValidationError({'error': f'not supported parsing {filename}'})
+    return final_files
 
 
 @REQUEST_API.route('/', methods=['POST'])
@@ -143,17 +151,25 @@ def upload(project_id: int):
         return jsonify({'error': f'Please check the following fields: {errors}'}), 400
 
     uploader = data["uploader_name"]
-    split = data["split"]
+    split = data["split_name"]
     files = request.files.getlist("files")
     if files is None:
         return jsonify({'error': f'Files field not found'}), 400
     uploaded_files = _check_files(files)
-    if type(uploaded_files) is tuple:
-        return uploaded_files
     passed, failed, annotations = upload_files(uploaded_files, project_id, uploader, split)
 
     return jsonify(
         {'message': f'Uploaded {passed} images and {annotations} annotations. There were {failed} failed images'}), 201
+
+
+@REQUEST_API.route('/<int:project_id>/upload_classes', methods=["POST"])
+def upload_classes(project_id: int):
+    file = request.files.get("file")
+    if file is None:
+        raise ValidationError({"error": "Cant read this file"})
+    upload_class_file(file, project_id)
+
+    return jsonify({"message": "Uploaded classes"})
 
 
 @REQUEST_API.route('/<int:project_id>', methods=['GET'])
@@ -195,12 +211,44 @@ def get_project_images(project_id):
 
 @REQUEST_API.route('/<int:project_id>/models', methods=['GET'])
 def get_all_models(project_id):
-    models = get_models(project_id)
+    page_size = request.args.get("page_size")
+    page_size = validate_page_size(page_size, 20, 100)
+    page_nr = request.args.get("page_nr")
+    page_nr = validate_page_nr(page_nr)
+
+    models = get_models(project_id, page_nr, page_size)
 
     return models
 
 
 @REQUEST_API.route('/<int:project_id>/annotations', methods=['GET'])
 def get_annotations(project_id):
-    annotations = retrieve_annotations(project_id)
-    return annotations
+    page_size = request.args.get("page_size")
+    page_size = validate_page_size(page_size, 20, 100)
+    page_nr = request.args.get("page_nr")
+    page_nr = validate_page_nr(page_nr)
+
+    annotations = retrieve_annotations(project_id, page_nr, page_size)
+    return jsonify(annotations), 200
+
+def weighted_result_to_dict(x):
+    score, ae = x
+    return {
+        "score": score,
+        "image": ae.image_id,
+        "model": ae.model_id,
+        "human_annotation_id": ae.human_annotation_id,
+        "model_annotation_id": ae.model_annotation_id,
+        "error_id": ae.id
+    }
+
+@REQUEST_API.route('/<int:project_id>/errors', methods=['GET'])
+def get_project_errors(project_id):
+    page_size = request.args.get("page_size")
+    page_size = validate_page_size(page_size, 20, 100)
+    page_nr = request.args.get("page_nr")
+    page_nr = validate_page_nr(page_nr)
+
+    data = retrieve_project_errors(project_id, page_nr, page_size)
+    data = [weighted_result_to_dict(x) for x in data]
+    return jsonify(data), 200
