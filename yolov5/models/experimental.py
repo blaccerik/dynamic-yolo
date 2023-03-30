@@ -2,13 +2,14 @@
 """
 Experimental modules
 """
+import io
 import math
 
 import numpy as np
 import torch
 import torch.nn as nn
 
-from utils.downloads import attempt_download
+from yolov5.utils.downloads import attempt_download
 
 
 class Sum(nn.Module):
@@ -70,15 +71,18 @@ class Ensemble(nn.ModuleList):
         return y, None  # inference, train output
 
 
-def attempt_load(weights, device=None, inplace=True, fuse=True):
+def attempt_load(weights, device=None, inplace=True, fuse=True, binary_weights=None):
     # Loads an ensemble of models weights=[a,b,c] or a single model weights=[a] or weights=a
-    from models.yolo import Detect, Model
+    from yolov5.models.yolo import Detect, Model
 
     model = Ensemble()
     for w in weights if isinstance(weights, list) else [weights]:
-        ckpt = torch.load(attempt_download(w), map_location='cpu')  # load
+        # load model
+        if binary_weights is not None:
+            ckpt = torch.load(io.BytesIO(binary_weights), map_location='cpu')
+        else:
+            ckpt = torch.load(attempt_download(w), map_location='cpu')  # load
         ckpt = (ckpt.get('ema') or ckpt['model']).to(device).float()  # FP32 model
-
         # Model compatibility updates
         if not hasattr(ckpt, 'stride'):
             ckpt.stride = torch.tensor([32.])

@@ -107,6 +107,46 @@
         }
       }
     },
+    "/projects/{project_id}/upload_classes": {
+      "post": {
+        "tags": [
+          "Project Requests"
+        ],
+        "summary": "Upload class names to project",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "description": "Project id",
+            "schema": {
+              "$ref": "#/components/schemas/project_id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        }
+      }
+    },
     "/projects/{project_id}": {
       "get": {
         "tags": [
@@ -262,6 +302,62 @@
         }
       }
     },
+    "/projects/{project_id}/errors": {
+      "get": {
+        "tags": [
+          "Project Requests"
+        ],
+        "summary": "Get errors for a project",
+        "description": "Get a paginated list of images for a project",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "description": "ID of the project to get images for",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "Number of images to be returned per page",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "page_nr",
+            "in": "query",
+            "description": "Page number",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A list errors for the project",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/image"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/queue": {
       "get": {
         "tags": [
@@ -300,6 +396,13 @@
                 "properties": {
                   "project_id": {
                     "type": "integer"
+                  },
+                  "tasks": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": ["train", "test", "check"]
+                    }
                   }
                 },
                 "required": [
@@ -344,6 +447,97 @@
             "schema": {
               "type": "integer"
             }
+          },
+          {
+            "name": "error_id",
+            "in": "query",
+            "description": "Show only certain error",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "show_annotations",
+            "in": "query",
+            "description": "Show bounding boxes",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "show_type",
+            "in": "query",
+            "description": "Show model errors",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "latest",
+                "all"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Image not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/images/{image_id}/errors": {
+      "get": {
+        "tags": [
+          "Images Requests"
+        ],
+        "summary": "Get image errors",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "image_id",
+            "description": "ID of the image to retrieve",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "error_id",
+            "in": "query",
+            "description": "Show only certain error",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "show_type",
+            "in": "query",
+            "description": "Show model errors",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "latest",
+                "all"
+              ]
+            }
           }
         ],
         "responses": {
@@ -380,6 +574,28 @@
             "required": true,
             "schema": {
               "type": "integer"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "Number of models to be returned per page",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "page_nr",
+            "in": "query",
+            "description": "Page number",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 1
             }
           }
         ],
@@ -468,6 +684,40 @@
         }
       }
     },
+    "/models/{project_id}": {
+      "post": {
+        "tags": [
+          "Models Requests"
+        ],
+        "summary": "Upload a new model to the project",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "description": "Project ID",
+            "schema": {
+              "$ref": "#/components/schemas/project_id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/upload_model"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        }
+      }
+    },
     "/projects/{project_id}/annotations": {
       "get": {
         "tags": [
@@ -481,6 +731,28 @@
             "required": true,
             "schema": {
               "type": "integer"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "Number of annotations to be returned per page",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "page_nr",
+            "in": "query",
+            "description": "Page number",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 1
             }
           }
         ],
@@ -520,6 +792,7 @@
           }
         ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
@@ -578,6 +851,273 @@
             "description": "Annotation not found."
           }
         }
+      },
+      "delete": {
+        "tags": [
+          "Annotations Requests"
+        ],
+        "summary": "Delete annotation and everything related to it",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "annotation_id",
+            "description": "ID of the annotation",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/annotation_id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Succesful deletion."
+          },
+          "400": {
+            "description": "Annotation not found."
+          }
+        }
+      }
+    },
+    "/annotations/extra/{annotation_id}": {
+      "delete": {
+        "tags": [
+          "Annotations Requests"
+        ],
+        "summary": "Remove extra information associated with an annotation",
+        "parameters": [
+          {
+            "name": "annotation_id",
+            "in": "path",
+            "description": "Annotation ID",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/annotation_id"
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Invalid annotation ID"
+          },
+          "200": {
+            "description": "Successful deletion"
+          }
+        }
+      }
+    },
+    "/annotations": {
+      "post": {
+        "tags": [
+          "Annotations Requests"
+        ],
+        "summary": "Add an annotation manually.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "uploader",
+            "description": "Name of the uploader",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/post_annotation"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The updated annotation object.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/post_annotation"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request body."
+          },
+          "404": {
+            "description": "Annotation not found"
+          }
+        }
+      }
+    },
+    "/annotations/{annotation_error_id}": {
+      "post": {
+        "tags": [
+          "Annotations Requests"
+        ],
+        "summary": "Choose which annotations to keep",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "annotation_error_id",
+            "description": "Annotation error ID",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "uploader",
+            "description": "Name of the uploader",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "keep",
+            "in": "query",
+            "description": "Choose which annotation to keep",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "model",
+                "human",
+                "both"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400-AnnotationErrorNotFound": {
+            "description": "Annotation error not found"
+          },
+          "400-UserNotFoundError": {
+            "description": "User not found"
+          }
+        }
+      }
+    },
+    "/results": {
+      "get": {
+        "tags": [
+          "Results Requests"
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "query",
+            "description": "Specify the project of which results you want to see",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "model_id",
+            "in": "query",
+            "description": "Model ID of the result",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "subset_name",
+            "in": "query",
+            "description": "Name of the subset",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "test",
+                "val"
+              ]
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "Number of results to be returned per page",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "page_nr",
+            "in": "query",
+            "description": "Page number",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          }
+        ],
+        "summary": "Get all the results",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/simple_model_results"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Invalid project"
+          }
+        }
+      }
+    },
+    "/results/{result_id}": {
+      "get": {
+        "tags": [
+          "Results Requests"
+        ],
+        "summary": "Get detailed info about trained model",
+        "parameters": [
+          {
+            "name": "result_id",
+            "in": "path",
+            "description": "Result ID",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Results info",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/detailed_model_results"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Result not found"
+          }
+        }
       }
     }
   },
@@ -621,9 +1161,14 @@
             "type": "string",
             "format": "string"
           },
-          "split": {
+          "split_name": {
             "type": "string",
-            "format": "string"
+            "enum": [
+              "train",
+              "val",
+              "test",
+              "random"
+            ]
           },
           "files": {
             "type": "array",
@@ -634,377 +1179,529 @@
           }
         }
       },
+      "upload_model": {
+        "type": "object",
+        "properties": {
+          "model_file": {
+            "type": "string",
+            "format": "binary"
+          }
+        }},
       "project_settings": {
-        "type": "object",
-        "properties": {
-          "epochs": {
-            "type": "integer",
-            "description": "Number of training epochs"
-          },
-          "batch_size": {
-            "type": "integer",
-            "description": "Batch size for training"
-          },
-          "confidence_threshold": {
-            "type": "number",
-            "description": "Confidence threshold for skipping images"
-          },
-          "train_test_ratio": {
-            "type": "number",
-            "description": "Training and testing data split ratio"
-          },
-          "minimal_map_50_threshold": {
-            "type": "number",
-            "description": "Minimal map threshold"
-          },
-          "min_confidence_threshold": {
-            "type": "number",
-            "description": "Minimum confidence threshold for detection"
-          },
-          "min_iou_threshold": {
-            "type": "number",
-            "description": "Minimum intersection over union threshold for detection"
+          "type": "object",
+          "properties": {
+            "epochs": {
+              "type": "integer",
+              "description": "Number of training epochs"
+            },
+            "batch_size": {
+              "type": "integer",
+              "description": "Batch size for training"
+            },
+            "train_ratio": {
+              "type": "number",
+              "description": "Training  data split ratio"
+            },
+            "val_ratio": {
+              "type": "number",
+              "description": "Validation data split ratio"
+            },
+            "check_size_difference_threshold": {
+              "type": "number",
+              "default": 0.0
+            },
+            "check_center_difference_threshold": {
+              "type": "number",
+              "default": 0.0
+            },
+            "check_error_amount_threshold": {
+              "type": "number",
+              "default": 0.0
+            },
+            "maximum_auto_train_number": {
+              "type": "number",
+              "default": 0
+            },
+            "min_confidence_threshold": {
+              "type": "number",
+              "description": "Minimum confidence threshold for detection",
+              "default": 0.0
+            },
+            "min_iou_threshold": {
+              "type": "number",
+              "description": "Minimum intersection over union threshold for detection",
+              "default": 0.0
+            },
+            "always_test": {
+              "type": "boolean",
+              "default": false
+            },
+            "always_check": {
+              "type": "boolean",
+              "default": false
+            },
+            "freeze_backbone": {
+              "type": "boolean",
+              "default": false
+            },
+            "use_ram": {
+              "type": "boolean",
+              "default": false
+            },
+            "devices": {
+              "type": "string",
+              "default": "0"
+            },
+            "minimal_map_50_threshold": {
+              "type": "number",
+              "description": "Minimal map threshold",
+              "default": 0.0
+            },
+            "minimal_map_50_95_threshold": {
+              "type": "number",
+              "default": 0.0
+            },
+            "minimal_precision_threshold": {
+              "type": "number",
+              "default": 0.0
+            },
+            "minimal_recall_threshold": {
+              "type": "number",
+              "default": 0.0
+            }
           }
-        }
-      },
+        },
       "get_project_settings": {
-        "type": "object",
-        "properties": {
-          "max_class_nr": {
-            "type": "integer"
-          },
-          "epochs": {
-            "type": "integer"
-          },
-          "batch_size": {
-            "type": "integer"
-          },
-          "initial_model": {
-            "type": "string",
-            "format": "string"
-          },
-          "confidence_threshold": {
-            "type": "integer"
-          },
-          "train_test_ratio": {
-            "type": "integer"
-          },
-          "minimal_map_50_threshold": {
-            "type": "integer"
-          },
-          "min_confidence_threshold": {
-            "type": "integer"
-          },
-          "min_iou_threshold": {
-            "type": "integer"
+          "type": "object",
+          "properties": {
+            "max_class_nr": {
+              "type": "integer"
+            },
+            "epochs": {
+              "type": "integer"
+            },
+            "batch_size": {
+              "type": "integer"
+            },
+            "img_size": {
+              "type": "integer"
+            },
+            "initial_model": {
+              "type": "string",
+              "format": "string"
+            },
+            "train_ratio": {
+              "type": "integer"
+            },
+            "val_ratio": {
+              "type": "integer"
+            },
+            "pretest_size_difference_threshold": {
+              "type": "number"
+            },
+            "maximum_auto_train_number": {
+              "type": "integer"
+            },
+            "skip_pretesting": {
+              "type": "boolean"
+            },
+            "freeze_backbone": {
+              "type": "boolean"
+            },
+            "use_ram": {
+              "type": "boolean"
+            },
+            "minimal_map_50_threshold": {
+              "type": "integer"
+            },
+            "minimal_map_50_95_threshold": {
+              "type": "integer"
+            },
+            "minimal_precision_threshold": {
+              "type": "integer"
+            },
+            "minimal_recall_threshold": {
+              "type": "integer"
+            },
+            "min_confidence_threshold": {
+              "type": "integer"
+            },
+            "min_iou_threshold": {
+              "type": "integer"
+            }
           }
-        }
-      },
+        },
       "simple_model_info": {
-        "type": "object",
-        "properties": {
-          "model_status_name": {
-            "type": "string",
-            "description": "Status of the model"
-          },
-          "id": {
-            "type": "integer",
-            "format": "int64",
-            "description": "ID of the model"
-          },
-          "added": {
-            "type": "string",
-            "format": "date-time",
-            "description": "Date and time the model was added"
-          },
-          "project_id": {
-            "type": "integer",
-            "format": "int64",
-            "description": "ID of the project model is associated with"
+          "type": "object",
+          "properties": {
+            "model_status_name": {
+              "type": "string",
+              "description": "Status of the model"
+            },
+            "id": {
+              "type": "integer",
+              "format": "int64",
+              "description": "ID of the model"
+            },
+            "added": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Date and time the model was added"
+            },
+            "project_id": {
+              "type": "integer",
+              "format": "int64",
+              "description": "ID of the project model is associated with"
+            }
           }
-        }
-      },
+        },
       "model_id": {
-        "type": "integer"
-      },
+          "type": "integer"
+        },
       "simple_annotation_info": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "integer",
-            "description": "ID of the annotation"
-          },
-          "project_id": {
-            "type": "integer",
-            "description": "ID of the project"
-          },
-          "annotator_name": {
-            "type": "string",
-            "description": "Annotator of the annotation"
-          },
-          "image_id": {
-            "type": "integer",
-            "description": "ID of the image"
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "integer",
+              "description": "ID of the annotation"
+            },
+            "project_id": {
+              "type": "integer",
+              "description": "ID of the project"
+            },
+            "annotator_name": {
+              "type": "string",
+              "description": "Annotator of the annotation"
+            },
+            "image_id": {
+              "type": "integer",
+              "description": "ID of the image"
+            }
           }
-        }
-      },
+        },
       "image": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "annotations": {
-            "type": "array",
-            "items": {
+          "type": "object",
+          "properties": {
+            "id": {
               "type": "integer",
-              "description": "ID-s of annotations"
+              "format": "int64"
+            },
+            "annotations": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "description": "ID-s of annotations"
+              }
+            },
+            "models": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "description": "ID-s of models"
+              }
+            },
+            "subset_name": {
+              "type": "string",
+              "format": "string"
             }
-          },
-          "models": {
-            "type": "array",
-            "items": {
-              "type": "integer",
-              "description": "ID-s of models"
-            }
-          },
-          "subset_name": {
-            "type": "string",
-            "format": "string"
           }
-        }
-      },
+        },
       "model_info": {
-        "type": "object",
-        "properties": {
-          "parent_model_id": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "added": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "total_epochs": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "epochs": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "model_status_name": {
-            "type": "string"
-          },
-          "project_id": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "model_results": {
-            "type": "array",
-            "items": {
+          "type": "object",
+          "properties": {
+            "parent_model_id": {
               "type": "integer",
-              "description": "ID-s of results"
+              "format": "int64"
+            },
+            "added": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "total_epochs": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "epochs": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "model_status_name": {
+              "type": "string"
+            },
+            "project_id": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "model_results": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "description": "ID-s of results"
+              }
+            },
+            "images": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "description": "ID-s of images"
+              }
             }
           },
-          "images": {
-            "type": "array",
-            "items": {
+          "required": [
+            "id",
+            "added",
+            "total_epochs",
+            "epochs",
+            "model_status_id",
+            "project_id"
+          ]
+        },
+        "ModelImage": {
+          "type": "object",
+          "properties": {
+            "model_id": {
               "type": "integer",
-              "description": "ID-s of images"
+              "format": "int64"
+            },
+            "image_id": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          "required": [
+            "model_id",
+            "image_id"
+          ]
+        },
+        "Queue": {
+          "type": "object",
+          "properties": {
+            "position": {
+              "type": "integer"
+            },
+            "project_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "position",
+            "project_id"
+          ]
+        },
+        "annotation_info": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "integer"
+            },
+            "x_center": {
+              "type": "number",
+              "format": "float"
+            },
+            "y_center": {
+              "type": "number",
+              "format": "float"
+            },
+            "width": {
+              "type": "number",
+              "format": "float"
+            },
+            "height": {
+              "type": "number",
+              "format": "float"
+            },
+            "class_id": {
+              "type": "integer"
+            },
+            "project_id": {
+              "type": "integer"
+            },
+            "image_id": {
+              "type": "integer"
+            },
+            "annotator_name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "x_center",
+            "y_center",
+            "width",
+            "height",
+            "class_id",
+            "project_id",
+            "annotator_id"
+          ]
+        },
+        "change_annotation": {
+          "type": "object",
+          "properties": {
+            "x_center": {
+              "type": "number",
+              "format": "float"
+            },
+            "y_center": {
+              "type": "number",
+              "format": "float"
+            },
+            "width": {
+              "type": "number",
+              "format": "float"
+            },
+            "height": {
+              "type": "number",
+              "format": "float"
+            },
+            "class_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "id",
+            "x_center",
+            "y_center",
+            "width",
+            "height",
+            "class_id",
+            "project_id",
+            "annotator_id"
+          ]
+        },
+        "annotation_id": {
+          "type": "integer"
+        },
+        "simple_model_results": {
+          "type": "object",
+          "properties": {
+            "result_id": {
+              "type": "integer"
+            },
+            "subset_name": {
+              "type": "string"
+            },
+            "model_id": {
+              "type": "integer"
+            },
+            "metric_precision": {
+              "type": "number",
+              "format": "float"
+            },
+            "metric_recall": {
+              "type": "number",
+              "format": "float"
+            },
+            "metric_map_50": {
+              "type": "number",
+              "format": "float"
+            },
+            "metric_map_50_95": {
+              "type": "number",
+              "format": "float"
             }
           }
         },
-        "required": [
-          "id",
-          "added",
-          "total_epochs",
-          "epochs",
-          "model_status_id",
-          "project_id"
-        ]
-      },
-      "ModelImage": {
-        "type": "object",
-        "properties": {
-          "model_id": {
-            "type": "integer",
-            "format": "int64"
+        "detailed_model_results": {
+          "type": "object",
+          "properties": {
+            "result_id": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "model_id": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "project_id": {
+              "type": "integer"
+            },
+            "subset_name": {
+              "type": "string"
+            },
+            "epoch": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true
+            },
+            "metric_precision": {
+              "type": "number",
+              "format": "float"
+            },
+            "metric_recall": {
+              "type": "number",
+              "format": "float"
+            },
+            "metric_map_50": {
+              "type": "number",
+              "format": "float"
+            },
+            "metric_map_50_95": {
+              "type": "number",
+              "format": "float"
+            },
+            "val_box_loss": {
+              "type": "number",
+              "format": "float"
+            },
+            "val_obj_loss": {
+              "type": "number",
+              "format": "float"
+            },
+            "val_cls_loss": {
+              "type": "number",
+              "format": "float"
+            }
           },
-          "image_id": {
-            "type": "integer",
-            "format": "int64"
-          }
+          "required": [
+            "model_id",
+            "subset_id",
+            "metric_precision",
+            "metric_recall",
+            "metric_map_50",
+            "metric_map_50_95",
+            "val_box_loss",
+            "val_obj_loss",
+            "val_cls_loss"
+          ]
         },
-        "required": [
-          "model_id",
-          "image_id"
-        ]
-      },
-      "ModelResults": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "integer",
-            "format": "int64"
+        "post_annotation": {
+          "type": "object",
+          "properties": {
+            "x_center": {
+              "type": "number",
+              "format": "float"
+            },
+            "y_center": {
+              "type": "number",
+              "format": "float"
+            },
+            "width": {
+              "type": "number",
+              "format": "float"
+            },
+            "height": {
+              "type": "number",
+              "format": "float"
+            },
+            "class_id": {
+              "type": "integer"
+            },
+            "image_id": {
+              "type": "integer"
+            }
           },
-          "model_id": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "subset_id": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "epoch": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "metric_precision": {
-            "type": "number",
-            "format": "float"
-          },
-          "metric_recall": {
-            "type": "number",
-            "format": "float"
-          },
-          "metric_map_50": {
-            "type": "number",
-            "format": "float"
-          },
-          "metric_map_50_95": {
-            "type": "number",
-            "format": "float"
-          },
-          "val_box_loss": {
-            "type": "number",
-            "format": "float"
-          },
-          "val_obj_loss": {
-            "type": "number",
-            "format": "float"
-          },
-          "val_cls_loss": {
-            "type": "number",
-            "format": "float"
-          }
-        },
-        "required": [
-          "id",
-          "model_id",
-          "subset_id",
-          "metric_precision",
-          "metric_recall",
-          "metric_map_50",
-          "metric_map_50_95",
-          "val_box"
-        ]
-      },
-      "Queue": {
-        "type": "object",
-        "properties": {
-          "position": {
-            "type": "integer"
-          },
-          "project_id": {
-            "type": "integer"
-          }
-        },
-        "required": [
-          "position",
-          "project_id"
-        ]
-      },
-      "annotation_info": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "integer"
-          },
-          "confidence": {
-            "type": "number",
-            "format": "float"
-          },
-          "x_center": {
-            "type": "number",
-            "format": "float"
-          },
-          "y_center": {
-            "type": "number",
-            "format": "float"
-          },
-          "width": {
-            "type": "number",
-            "format": "float"
-          },
-          "height": {
-            "type": "number",
-            "format": "float"
-          },
-          "class_id": {
-            "type": "integer"
-          },
-          "project_id": {
-            "type": "integer"
-          },
-          "image_id": {
-            "type": "integer"
-          },
-          "annotator_name": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "x_center",
-          "y_center",
-          "width",
-          "height",
-          "class_id",
-          "project_id",
-          "annotator_id"
-        ]
-      },
-      "change_annotation": {
-        "type": "object",
-        "properties": {
-          "x_center": {
-            "type": "number",
-            "format": "float"
-          },
-          "y_center": {
-            "type": "number",
-            "format": "float"
-          },
-          "width": {
-            "type": "number",
-            "format": "float"
-          },
-          "height": {
-            "type": "number",
-            "format": "float"
-          },
-          "class_id": {
-            "type": "integer"
-          }
-        },
-        "required": [
-          "id",
-          "x_center",
-          "y_center",
-          "width",
-          "height",
-          "class_id",
-          "project_id",
-          "annotator_id"
-        ]
-      },
-      "annotation_id": {
-        "type": "integer"
+          "required": [
+            "id",
+            "x_center",
+            "y_center",
+            "width",
+            "height",
+            "class_id",
+            "image_id"
+          ]
+        }
       }
     }
   }
-}
 
 

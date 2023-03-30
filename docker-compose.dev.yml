@@ -1,0 +1,48 @@
+version: '3.7'
+services:
+  postgres:
+    container_name: yolo_postgres
+    networks:
+      - yolo
+    image: postgres:13.2-alpine
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: $DB_NAME
+      POSTGRES_USER: $DB_USERNAME
+      POSTGRES_PASSWORD: $DB_PASSWORD
+    volumes:
+      - postgres:/var/lib/postgresql/data
+  flask:
+    deploy:
+      resources:
+        limits:
+          memory: 20g
+        reservations:
+          memory: 20g
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [ gpu ]
+      # remove tty to not keep it alive
+    tty: true
+    # yolo memory problem
+    # Unexpected bus error encountered in worker. This might be caused by insufficient shared memory (shm).
+    ipc: host
+    networks:
+      - yolo
+    depends_on:
+      - postgres
+    ports:
+      - "8080:8080"
+    build:
+      context:
+        .
+    container_name: yolo_flask
+
+networks:
+  yolo:
+
+volumes:
+  postgres:

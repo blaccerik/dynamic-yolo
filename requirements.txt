@@ -22,6 +22,7 @@ cycler==0.11.0
 debugpy==1.6.3
 decorator==5.1.1
 defusedxml==0.7.1
+docker==6.0.1
 entrypoints==0.4
 executing==1.2.0
 fastjsonschema==2.16.2
@@ -154,6 +155,7 @@ tzdata==2022.7
 tzlocal==4.2
 urllib3==1.26.12
 visions==0.7.5
+waitress==2.1.2
 watchdog==2.2.1
 wcwidth==0.2.5
 webencodings==0.5.1

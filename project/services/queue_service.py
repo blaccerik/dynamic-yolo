@@ -1,16 +1,25 @@
+import os
+import subprocess
+
 from sqlalchemy import func, asc
 
 from project import db
-from project.models.project_status import ProjectStatus
 from project.models.project import Project
+from project.models.project_settings import ProjectSettings
+from project.models.project_status import ProjectStatus
 from project.models.queue import Queue
-from project.services.training_service import start_training
+from project.models.task import Task
 
 
 def update_queue(app):
     """
     Call this function to check for updates in the queue
     :return:
+    """
+    """
+    RuntimeError: The server socket has failed to listen on any local network address. 
+    The server socket has failed to bind to [::]:29500 (errno: 98 - Address already in use). 
+    The server socket has failed to bind to 0.0.0.0:29500 (errno: 98 - Address already in use).
     """
     with app.app_context():
         queue = Queue.query.order_by(asc(Queue.position)).all()
@@ -54,25 +63,62 @@ def update_queue(app):
             print("project is in error state")
             return
 
+        # get devices
+        ps = ProjectSettings.query.get(project_id)
+        dev_string = str(ps.devices)
+        number = dev_string.count(",") + 1
         # train
-        error = start_training(project)
-        if error:
-            new_ps = ProjectStatus.query.filter(ProjectStatus.name.like("error")).first()
+        if number <= 1:
+            process = subprocess.Popen([
+                "python",
+                "main.py",
+                "--project_id", str(project.id),
+                "--task_id", str(first.task_id)
+            ])
         else:
+            process = subprocess.Popen([
+                "python",
+                "-m", "torch.distributed.run",
+                "--nproc_per_node", str(number),
+                "main.py",
+                "--project_id", str(project.id),
+                "--task_id", str(first.task_id)
+            ])
+        exit_code = process.wait()
+        print("subprocess finished")
+        db.session.refresh(project)
+        project_settings = ProjectSettings.query.get(project_id)
+        if exit_code == 0:  # all good
             new_ps = ProjectStatus.query.filter(ProjectStatus.name.like("idle")).first()
-        # set project state
+
+            # find if it needs to add to queue
+            if project.auto_train_count > 0:
+                task = ""
+                if project_settings.always_check:
+                    task = "check"
+                task = task + "train"
+                if project_settings.always_test:
+                    task = task + "test"
+                add_to_queue(project_id, task, reset_counter=False)
+        else:
+            new_ps = ProjectStatus.query.filter(ProjectStatus.name.like("error")).first()
+
+        db.session.refresh(project)
         project.project_status_id = new_ps.id
         db.session.add(project)
         db.session.commit()
 
 
-def add_to_queue(project_id: int):
+def add_to_queue(project_id: int, task_name: str, reset_counter=True):
     """
     Add project to query
     """
     project = Project.query.get(project_id)
     if project is None:
         return "Project not found!", 1
+    project_settings = ProjectSettings.query.get(project_id)
+    if project_settings is None:
+        return "Project settings not found!", 1
 
     # search queue to see if project is already there
     # if it is then don't touch it
@@ -82,8 +128,18 @@ def add_to_queue(project_id: int):
     position = db.session.query(func.max(Queue.position)).scalar()
     if position is None:
         position = 0
-    q = Queue(position=position + 1, project_id=project.id)
+
+    task = Task.query.filter(Task.name.like(task_name)).first()
+    if task is None:
+        return "Task not found", 1
+
+    q = Queue(position=position + 1, project_id=project.id, task_id=task.id)
     db.session.add(q)
+
+    if reset_counter:
+        project.auto_train_count = project_settings.maximum_auto_train_number
+        db.session.add(project)
+
     db.session.commit()
 
     return "Added to queue successfully", 3
