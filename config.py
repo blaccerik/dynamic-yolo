@@ -21,9 +21,9 @@ class Config(object):
 
 class ProductionConfig(Config):
     ENV = 'production'
-    SQLALCHEMY_DATABASE_URI = \
-        f"postgresql://{os.environ['DB_USERNAME']}:{os.environ['DB_PASSWORD']}@{os.environ['DB_LOCATION']}/{os.environ['DB_NAME']}"
-    pass
+    # SQLALCHEMY_DATABASE_URI = \
+    #     f"postgresql://{os.environ['DB_USERNAME']}:{os.environ['DB_PASSWORD']}@{os.environ['DB_LOCATION']}/{os.environ['DB_NAME']}"
+    # pass
 
 
 class DevelopmentConfig(Config):
