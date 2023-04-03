@@ -14,15 +14,6 @@ services:
       POSTGRES_PASSWORD: $DB_PASSWORD
     volumes:
       - postgres:/var/lib/postgresql/data
-  pgadmin:
-    networks:
-      - yolo
-    image: chorss/docker-pgadmin4
-    container_name: yolo_pgadmin4
-    depends_on:
-      - postgres
-    ports:
-      - "5050:5050"
 
 networks:
   yolo:

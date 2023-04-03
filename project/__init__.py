@@ -26,13 +26,6 @@ load_dotenv()
 DB_READ_BATCH_SIZE = int(os.getenv("DB_READ_BATCH_SIZE"))
 NUMBER_OF_YOLO_WORKERS = int(os.getenv("NUMBER_OF_YOLO_WORKERS"))
 
-# sys.path.insert(0, f"{APP_ROOT_PATH}/training_session/yolov5/")
-# sys.path.insert(0, f"{APP_ROOT_PATH}/training_session/yolov5/models")
-# sys.path.insert(0, './yolov5')
-# sys.path.append(f"{APP_ROOT_PATH}/training_session/yolov5/models")
-# sys.path.append(f"{APP_ROOT_PATH}/training_session/yolov5/")
-# print(sys.path)
-
 ### swagger specific ###
 SWAGGER_URL = '/swagger'
 API_URL = '/static/swagger.json'
