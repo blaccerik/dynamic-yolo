@@ -460,23 +460,19 @@
           {
             "name": "show_annotations",
             "in": "query",
-            "description": "Show bounding boxes",
+            "description": "Show human made bounding boxes",
             "required": false,
             "schema": {
               "type": "boolean"
             }
           },
           {
-            "name": "show_type",
+            "name": "model_id",
             "in": "query",
-            "description": "Show model errors",
+            "description": "Show errors made by certain model, latest or all models",
             "required": false,
             "schema": {
-              "type": "string",
-              "enum": [
-                "latest",
-                "all"
-              ]
+              "type": "string"
             }
           }
         ],
@@ -501,7 +497,7 @@
         }
       }
     },
-    "/images/{image_id}/errors": {
+    "/images/{image_id}/json": {
       "get": {
         "tags": [
           "Images Requests"
@@ -527,16 +523,21 @@
             }
           },
           {
-            "name": "show_type",
+            "name": "show_annotations",
             "in": "query",
-            "description": "Show model errors",
+            "description": "Show human made bounding boxes",
             "required": false,
             "schema": {
-              "type": "string",
-              "enum": [
-                "latest",
-                "all"
-              ]
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "model_id",
+            "in": "query",
+            "description": "Show errors made by certain model, latest or all models",
+            "required": false,
+            "schema": {
+              "type": "string"
             }
           }
         ],
