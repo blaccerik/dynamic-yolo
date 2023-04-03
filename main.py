@@ -112,6 +112,20 @@ class ProjectSettings(base):
     minimal_precision_threshold = Column(Float, nullable=False, default=0)
     minimal_recall_threshold = Column(Float, nullable=False, default=0)
 
+    # error weights
+    model_class_confidence_weight = Column(Integer, nullable=False, default=1)
+    human_class_confidence_weight = Column(Integer, nullable=False, default=1)
+    annotation_confidence_weight = Column(Integer, nullable=False, default=1)
+
+    image_count_weight = Column(Float, nullable=False, default=1)
+
+    precision_weight = Column(Integer, nullable=False, default=1)
+    recall_weight = Column(Integer, nullable=False, default=1)
+    map_50_weight = Column(Integer, nullable=False, default=1)
+    map_50_95_weight = Column(Integer, nullable=False, default=1)
+
+    human_annotation_count_weight = Column(Float, nullable=False, default=1)
+
 
 class InitialModel(base):
     __tablename__ = "initial_model"
@@ -959,6 +973,10 @@ class TrainSession:
                 self.project.latest_model_id = self.new_model_id
             session.add(self.project)
             session.commit()
+
+        # clear dirs
+        if os.path.exists(f"{APP_ROOT_PATH}/data"):
+            shutil.rmtree(f"{APP_ROOT_PATH}/data")
 
 
 def initialize_yolo_folders():

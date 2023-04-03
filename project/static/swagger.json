@@ -1269,6 +1269,42 @@
             "minimal_recall_threshold": {
               "type": "number",
               "default": 0.0
+            },
+            "model_class_confidence_weight": {
+              "type": "number",
+              "default": 0
+            },
+            "human_class_confidence_weight": {
+              "type": "number",
+              "default": 0
+            },
+            "annotation_confidence_weight": {
+              "type": "number",
+              "default": 0
+            },
+            "image_count_weight": {
+              "type": "number",
+              "default": 0
+            },
+            "precision_weight": {
+              "type": "number",
+              "default": 0
+            },
+            "recall_weight": {
+              "type": "number",
+              "default": 0
+            },
+            "map_50_weight": {
+              "type": "number",
+              "default": 0
+            },
+            "map_50_95_weight": {
+              "type": "number",
+              "default": 0
+            },
+            "human_annotation_count_weight": {
+              "type": "number",
+              "default": 0
             }
           }
         },
@@ -1329,6 +1365,33 @@
             },
             "min_iou_threshold": {
               "type": "integer"
+            },
+            "model_class_confidence_weight": {
+              "type": "number"
+            },
+            "human_class_confidence_weight": {
+              "type": "number"
+            },
+            "annotation_confidence_weight": {
+              "type": "number"
+            },
+            "image_count_weight": {
+              "type": "number"
+            },
+            "precision_weight": {
+              "type": "number"
+            },
+            "recall_weight": {
+              "type": "number"
+            },
+            "map_50_weight": {
+              "type": "number"
+            },
+            "map_50_95_weight": {
+              "type": "number"
+            },
+            "human_annotation_count_weight": {
+              "type": "number"
             }
           }
         },
