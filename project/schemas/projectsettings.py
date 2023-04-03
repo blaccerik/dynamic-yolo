@@ -30,6 +30,20 @@ class ProjectSettingsSchema(Schema):
     minimal_precision_threshold = fields.Float(required=False)
     minimal_recall_threshold = fields.Float(required=False)
 
+    # error weights
+    model_class_confidence_weight = fields.Integer(required=False)
+    human_class_confidence_weight = fields.Integer(required=False)
+    annotation_confidence_weight = fields.Integer(required=False)
+
+    image_count_weight = fields.Float(required=False)
+
+    precision_weight = fields.Integer(required=False)
+    recall_weight = fields.Integer(required=False)
+    map_50_weight = fields.Integer(required=False)
+    map_50_95_weight = fields.Integer(required=False)
+
+    human_annotation_count_weight = fields.Float(required=False)
+
     @validates_schema
     def validate_age(self, data, **kwargs):
         self.between("epochs", data, 300)
@@ -57,6 +71,19 @@ class ProjectSettingsSchema(Schema):
         self.in_range("minimal_map_50_95_threshold", data)
         self.in_range("minimal_recall_threshold", data)
         self.in_range("minimal_precision_threshold", data)
+
+        self.between("model_class_confidence_weight", data, 20)
+        self.between("human_class_confidence_weight", data, 20)
+        self.between("annotation_confidence_weight", data, 20)
+
+        self.in_range("image_count_weight", data)
+
+        self.between("precision_weight", data, 20)
+        self.between("recall_weight", data, 20)
+        self.between("map_50_weight", data, 20)
+        self.between("map_50_95_weight", data, 20)
+
+        self.in_range("human_annotation_count_weight", data)
 
     def check_ratio(self, data):
         t = "train_ratio"

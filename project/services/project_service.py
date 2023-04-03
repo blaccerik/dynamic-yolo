@@ -236,7 +236,20 @@ def get_settings(project_code: int) -> dict:
         "minimal_map_50_threshold": project_settings.minimal_map_50_threshold,
         "minimal_map_50_95_threshold": project_settings.minimal_map_50_95_threshold,
         "minimal_precision_threshold": project_settings.minimal_precision_threshold,
-        "minimal_recall_threshold": project_settings.minimal_recall_threshold
+        "minimal_recall_threshold": project_settings.minimal_recall_threshold,
+
+        "model_class_confidence_weight": project_settings.model_class_confidence_weight,
+        "human_class_confidence_weight": project_settings.human_class_confidence_weight,
+        "annotation_confidence_weight": project_settings.annotation_confidence_weight,
+
+        "image_count_weight": project_settings.image_count_weight,
+
+        "precision_weight": project_settings.precision_weight,
+        "recall_weight": project_settings.recall_weight,
+        "map_50_weight": project_settings.map_50_weight,
+        "map_50_95_weight": project_settings.map_50_95_weight,
+
+        "human_annotation_count_weight": project_settings.human_annotation_count_weight
     }
 
 
@@ -300,27 +313,23 @@ def retrieve_annotations(project_code, page_nr, page_size):
     return annotations_to_return
 
 
-def find_score(model_class_confidence, human_class_confidence, confidence, image_count, mr: ModelResults, human_ano_count):
+def find_score(project_settings: ProjectSettings,
+               model_class_confidence,
+               human_class_confidence,
+               confidence,
+               image_count,
+               mr: ModelResults,
+               human_ano_count):
 
-    a = 5
-    b = 7
-    c = 6
-    d = 0.1
-    e = 5
-    f = 6
-    g = 5
-    h = 6
-    i = 0.3
-
-    score = model_class_confidence * a + \
-            human_class_confidence * b + \
-            confidence * c + \
-            image_count * d + \
-            mr.metric_precision * e + \
-            mr.metric_recall * f + \
-            mr.metric_map_50 * g + \
-            mr.metric_map_50_95 * h + \
-            human_ano_count * i
+    score = model_class_confidence * project_settings.model_class_confidence_weight + \
+            human_class_confidence * project_settings.human_class_confidence_weight + \
+            confidence * project_settings.annotation_confidence_weight + \
+            image_count * project_settings.image_count_weight + \
+            mr.metric_precision * project_settings.precision_weight + \
+            mr.metric_recall * project_settings.recall_weight + \
+            mr.metric_map_50 * project_settings.map_50_weight + \
+            mr.metric_map_50_95 * project_settings.map_50_95_weight + \
+            human_ano_count * project_settings.human_annotation_count_weight
     return score
 
 
@@ -329,6 +338,10 @@ def retrieve_project_errors(project_code, page_nr, page_size):
 
     if project is None:
         raise ValidationError({"error": f"Project not found"})
+
+    project_settings = ProjectSettings.query.get(project_code)
+    if project_settings is None:
+        raise ValidationError({"error": f"Project settings not found"})
 
     # Create aliases for the Annotation table
     a1 = aliased(Annotation)
@@ -354,7 +367,6 @@ def retrieve_project_errors(project_code, page_nr, page_size):
             model_results[model_id] = ModelStats(mr, mcr)
 
     weighted_results = []
-    seen = set()
     # go through every mistake and give it a score
     for ae, am, ah in query:
         model_id = ae.model_id
@@ -364,23 +376,26 @@ def retrieve_project_errors(project_code, page_nr, page_size):
 
         model_stats = model_results[model_id]
         confidence = ae.confidence
+
         if confidence is None:
             confidence = 1
+
         human_annotation_count = ae.human_annotation_count
+
         if human_annotation_count is None:
             human_annotation_count = 0
+
         image_count = ae.image_count
+
         model_class_confidence = 0
         if am is not None:
             model_class_confidence = model_stats.class_results[am.class_id]
-            values = (am.x_center, am.y_center, am.width, am.height, am.class_id)
-            if values in seen:
-                continue
-            seen.add(values)
+
+
         human_class_confidence = 1
         if ah is not None:
             human_class_confidence = model_stats.class_results[ah.class_id]
-        score = find_score(model_class_confidence, human_class_confidence, confidence, image_count, model_stats.mr, human_annotation_count)
+        score = find_score(project_settings, model_class_confidence, human_class_confidence, confidence, image_count, model_stats.mr, human_annotation_count)
         weighted_results.append((score, ae))
 
     weighted_results.sort(key=lambda x: x[0], reverse=True)

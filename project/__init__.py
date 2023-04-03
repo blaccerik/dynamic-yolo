@@ -203,27 +203,27 @@ def create_database(app):
         db.session.add(ps)
         db.session.commit()
 
-        # dummy data
-        pro = Project(name="project")
-        db.session.add(pro)
-        db.session.flush()
-        pros = ProjectSettings(id=pro.id, max_class_nr=80, epochs=1)
-        db.session.add(pros)
-        db.session.commit()
-
-        pro2 = Project(name="project2")
-        db.session.add(pro2)
-        db.session.flush()
-        pros2 = ProjectSettings(id=pro2.id, max_class_nr=80)
-        db.session.add(pros2)
-        db.session.commit()
-
-        a1 = Annotator()
-        a1.name = "model"
-        a2 = Annotator()
-        a2.name = "human"
-        db.session.add(a1)
-        db.session.add(a2)
-        db.session.commit()
+        # # dummy data
+        # pro = Project(name="project")
+        # db.session.add(pro)
+        # db.session.flush()
+        # pros = ProjectSettings(id=pro.id, max_class_nr=80, epochs=1)
+        # db.session.add(pros)
+        # db.session.commit()
+        #
+        # pro2 = Project(name="project2")
+        # db.session.add(pro2)
+        # db.session.flush()
+        # pros2 = ProjectSettings(id=pro2.id, max_class_nr=80)
+        # db.session.add(pros2)
+        # db.session.commit()
+        #
+        # a1 = Annotator()
+        # a1.name = "model"
+        # a2 = Annotator()
+        # a2.name = "human"
+        # db.session.add(a1)
+        # db.session.add(a2)
+        # db.session.commit()
 
 # TODO Fix observer functionality
