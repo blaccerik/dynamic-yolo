@@ -6,6 +6,8 @@ from project import db
 from project.models.annotation import Annotation
 from project.models.annotation_extra import AnnotationError
 from project.models.image import Image
+from project.models.model import Model
+from project.models.model_image import ModelImage
 from project.models.project import Project
 
 
@@ -65,16 +67,26 @@ def get_all_annotation_errors_(image_code: int):
 
     return query
 
-def get_errors_and_correct(image_code: int, error_id: int, show_human_annotations, show_type):
+def get_errors_and_correct(image_code: int, error_id: int, show_human_annotations, model_id):
 
-    latest_model = None
-    if show_type is None:
-        latest_model = -1
-    elif show_type == "latest":
-        latest_model = get_latest_model(image_code)
+    if model_id is None:
+        model_id = -1
+    elif model_id == "latest":
+        model_id = get_latest_model(image_code)
+    elif model_id == "all":
+        model_id = None
+    else:
+        m = db.session.query(Model.id).filter(Model.id == model_id).first()
+        if m is None:
+            raise ValidationError({"error": f"model not found"})
+        mi = db.session.query(ModelImage).filter(and_(
+            ModelImage.image_id == image_code,
+            ModelImage.model_id == model_id
+        )).first()
+        if mi is None:
+            raise ValidationError({"error": f"model didnt check this image"})
 
     errors = []
-    seen = set()
     for x in get_all_annotation_errors_(image_code):
         ae, am, ah = x
         if error_id is not None:
@@ -82,13 +94,8 @@ def get_errors_and_correct(image_code: int, error_id: int, show_human_annotation
                 errors.append(x)
                 break
         else:
-            if latest_model is not None and ae.model_id != latest_model:
+            if model_id is not None and ae.model_id != model_id:
                 continue
-            if am is not None:
-                values = (am.x_center, am.y_center, am.width, am.height, am.class_id)
-                if values in seen:
-                    continue
-                seen.add(values)
             errors.append(x)
 
     correct = [x for x in get_all_human_annotations(image_code) if show_human_annotations]
