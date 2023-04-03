@@ -143,8 +143,10 @@ def get_images(project_code: int, page_size: int, page_nr: int):
     models = models_query.all()
 
     annotations_query = db.session.query(Annotation.image_id, Annotation.id) \
-        .filter(Annotation.image_id.in_(image_ids)) \
-        .order_by(Annotation.id)
+        .filter(and_(
+        Annotation.annotator_id != None,
+        Annotation.image_id.in_(image_ids)
+        )).order_by(Annotation.id)
 
     annotations = annotations_query.all()
 
