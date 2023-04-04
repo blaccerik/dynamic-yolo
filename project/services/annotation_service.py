@@ -111,6 +111,9 @@ def choose_between_annotations_to_keep(annotation_error_id, user_name, keep_valu
     if keep_value not in possible_keep_values:
         raise ValidationError("Wrong keep option")
 
+    if annotation_error.human_annotation_id is None or annotation_error.model_annotation_id is None:
+        raise ValidationError("Annotation error doesnt have 2 annotations")
+
     human_annotation = Annotation.query.get(annotation_error.human_annotation_id)
     model_annotation = Annotation.query.get(annotation_error.model_annotation_id)
 

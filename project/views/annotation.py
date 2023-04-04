@@ -61,7 +61,7 @@ def add_annotation():
     if image_id == 0:
         return jsonify({'error': f'Please check the following fields: image_id'}), 400
 
-    project_id = Image.query.get(data['image_id']).id
+    project_id = Image.query.get(data['image_id']).project_id
     data['project_id'] = project_id
     data['uploader'] = uploader
 

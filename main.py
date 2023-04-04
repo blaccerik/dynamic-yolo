@@ -113,18 +113,18 @@ class ProjectSettings(base):
     minimal_recall_threshold = Column(Float, nullable=False, default=0)
 
     # error weights
-    model_class_confidence_weight = Column(Integer, nullable=False, default=1)
+    model_class_confidence_weight = Column(Integer, nullable=False, default=16)
     human_class_confidence_weight = Column(Integer, nullable=False, default=1)
-    annotation_confidence_weight = Column(Integer, nullable=False, default=1)
+    annotation_confidence_weight = Column(Integer, nullable=False, default=8)
 
-    image_count_weight = Column(Float, nullable=False, default=1)
+    image_count_weight = Column(Float, nullable=False, default=0.9913)
 
-    precision_weight = Column(Integer, nullable=False, default=1)
-    recall_weight = Column(Integer, nullable=False, default=1)
+    precision_weight = Column(Integer, nullable=False, default=17)
+    recall_weight = Column(Integer, nullable=False, default=6)
     map_50_weight = Column(Integer, nullable=False, default=1)
-    map_50_95_weight = Column(Integer, nullable=False, default=1)
+    map_50_95_weight = Column(Integer, nullable=False, default=19)
 
-    human_annotation_count_weight = Column(Float, nullable=False, default=1)
+    human_annotation_count_weight = Column(Float, nullable=False, default=0.0063)
 
 
 class InitialModel(base):
