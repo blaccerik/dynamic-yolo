@@ -15,7 +15,7 @@ def retrieve_annotation(annotation_code):
     if annotation.annotator_id is None:
         name = None
     else:
-        name = Annotator.query.get(annotation.annotator_id)
+        name = Annotator.query.get(annotation.annotator_id).name
 
     annotation_dict = {
         'id': annotation.id,
