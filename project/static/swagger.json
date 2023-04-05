@@ -879,50 +879,12 @@
         }
       }
     },
-    "/annotations/extra/{annotation_id}": {
-      "delete": {
-        "tags": [
-          "Annotations Requests"
-        ],
-        "summary": "Remove extra information associated with an annotation",
-        "parameters": [
-          {
-            "name": "annotation_id",
-            "in": "path",
-            "description": "Annotation ID",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/annotation_id"
-            }
-          }
-        ],
-        "responses": {
-          "400": {
-            "description": "Invalid annotation ID"
-          },
-          "200": {
-            "description": "Successful deletion"
-          }
-        }
-      }
-    },
     "/annotations": {
       "post": {
         "tags": [
           "Annotations Requests"
         ],
         "summary": "Add an annotation manually.",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "uploader",
-            "description": "Name of the uploader",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -968,40 +930,21 @@
             "schema": {
               "type": "integer"
             }
-          },
-          {
-            "in": "query",
-            "name": "uploader",
-            "description": "Name of the uploader",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "keep",
-            "in": "query",
-            "description": "Choose which annotation to keep",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "enum": [
-                "model",
-                "human",
-                "both"
-              ]
-            }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/post_annotation_error"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful operation"
-          },
-          "400-AnnotationErrorNotFound": {
-            "description": "Annotation error not found"
-          },
-          "400-UserNotFoundError": {
-            "description": "User not found"
           }
         }
       }
@@ -1731,6 +1674,9 @@
         "post_annotation": {
           "type": "object",
           "properties": {
+            "uploader": {
+              "type": "string"
+            },
             "x_center": {
               "type": "number",
               "format": "float"
@@ -1761,8 +1707,20 @@
             "width",
             "height",
             "class_id",
-            "image_id"
+            "image_id",
+            "uploader"
           ]
+        },
+        "post_annotation_error": {
+          "type": "object",
+          "properties": {
+            "uploader": {
+              "type": "string"
+            },
+            "keep": {
+              "type": "string"
+            }
+          }
         }
       }
     }
