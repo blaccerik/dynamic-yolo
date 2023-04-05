@@ -14,6 +14,7 @@ from project.models.project_settings import ProjectSettings
 from project.models.model_image import ModelImage
 from project.models.initial_model import InitialModel
 from project.models.subset import Subset
+from project.models.task import Task
 
 
 def create_database_for_testing(db):
@@ -124,3 +125,6 @@ def create_database_for_testing(db):
 
     db.session.add_all([mr1, mr2])
     db.session.commit()
+
+
+
