@@ -68,7 +68,8 @@ def delete_extra_information(annotation_code):
     # if is human ano then anos remove related model anos
     if annotation.annotator_id is not None:
         for e in errors:
-            db.session.delete(Annotation.query.get(e.model_annotation_id))
+            if e.model_annotation_id is not None:
+                db.session.delete(Annotation.query.get(e.model_annotation_id))
     db.session.delete(annotation)
     db.session.commit()
 
